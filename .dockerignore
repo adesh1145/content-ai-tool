@@ -1,0 +1,58 @@
+# =============================================================================
+# Docker ignore — keeps image lean by excluding dev/test files
+# =============================================================================
+
+# Virtual environment (installed fresh in Docker build)
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+
+# Environment / Secrets (NEVER bake into image)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Database files (SQLite dev DB — use PostgreSQL in Docker)
+*.db
+*.sqlite3
+
+# Git
+.git/
+.gitignore
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs (mounted as volume)
+logs/
+*.log
+
+# Testing
+htmlcov/
+.coverage
+coverage.xml
+
+# Documentation
+docs/
+*.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker files themselves (not needed inside image)
+Dockerfile
+docker-compose*.yml
+.dockerignore

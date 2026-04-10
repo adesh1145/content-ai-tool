@@ -1,0 +1,30 @@
+# =============================================================================
+# docker-compose.override.yml — Development overrides
+# =============================================================================
+# This file is auto-merged by Docker Compose in dev (no --file flag needed).
+# DO NOT use in production — it enables hot reload and SQLite for fast dev.
+# =============================================================================
+
+version: "3.9"
+
+services:
+  app:
+    build:
+      target: runner
+    volumes:
+      - ./app:/app/app          # Hot reload: mount source into container
+      - ./logs:/app/logs
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      # Use SQLite in dev override to avoid needing PostgreSQL locally
+      - DATABASE_URL=sqlite+aiosqlite:///./content_tool.db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+
+  celery:
+    volumes:
+      - ./app:/app/app          # Hot reload for celery too
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./content_tool.db

@@ -1,0 +1,129 @@
+# =============================================================================
+# Content AI Tool — Docker Compose (Full Stack)
+# =============================================================================
+# Services:
+#   app          → FastAPI backend (port 8000)
+#   db           → PostgreSQL 16 (port 5432)
+#   redis        → Redis 7 (port 6379)
+#   celery       → Celery async task worker
+#   flower       → Celery task monitor UI (port 5555)
+# =============================================================================
+
+version: "3.9"
+
+# ── Shared network ────────────────────────────────────────────────────────────
+networks:
+  content_ai_net:
+    driver: bridge
+
+# ── Named volumes (persistent data) ──────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+
+# ── Base app config (DRY — reused by app and celery) ─────────────────────────
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: runner
+  env_file:
+    - .env
+  environment:
+    # Override database to use PostgreSQL (not SQLite) in Docker
+    - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-content_tool_db}
+    - REDIS_URL=redis://redis:6379/0
+    - CELERY_BROKER_URL=redis://redis:6379/1
+    - CELERY_RESULT_BACKEND=redis://redis:6379/2
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - content_ai_net
+  restart: unless-stopped
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+
+  # ── FastAPI App ─────────────────────────────────────────────────────────────
+  app:
+    <<: *app-base
+    container_name: content_ai_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs         # Persist logs to host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  celery:
+    <<: *app-base
+    container_name: content_ai_celery
+    command: >
+      celery -A app.infrastructure.celery.worker.celery_app
+      worker --loglevel=info --concurrency=4 -Q default
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.infrastructure.celery.worker.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Flower — Celery Monitor UI ──────────────────────────────────────────────
+  flower:
+    <<: *app-base
+    container_name: content_ai_flower
+    ports:
+      - "5555:5555"
+    command: >
+      celery -A app.infrastructure.celery.worker.celery_app
+      flower --port=5555 --broker=redis://redis:6379/1
+    depends_on:
+      - redis
+      - celery
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: content_ai_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-content_tool_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"             # Expose only for local dev inspection
+    networks:
+      - content_ai_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: content_ai_redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"             # Expose only for local dev inspection
+    networks:
+      - content_ai_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
