@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.interfaces.llm_provider import ILLMProvider
-from app.infrastructure.ai.llm_factory import get_llm_provider
+from app.infrastructure.ai.llm_factodry import get_llm_provider
 from app.infrastructure.db.connection import get_db_session
 
 settings = get_settings()

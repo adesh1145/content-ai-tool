@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.response import APIResponse
 from app.features.article_writer.adapters.schemas import ArticleRequest, ArticleResponse
-from app.features.article_writer.drivers.ai.article_graph import article_graph, ArticleState
+from app.features.article_writer.drivers.ai.article_graph import get_article_graph, ArticleState
+from app.dependencies import get_current_user_id
 from app.infrastructure.db.connection import get_db_session
 
 router = APIRouter(prefix="/content/article", tags=["Article Writer"])
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/content/article", tags=["Article Writer"])
 @router.post("", response_model=APIResponse[ArticleResponse], status_code=201)
 async def generate_article(
     body: ArticleRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """
@@ -55,7 +57,8 @@ async def generate_article(
             "error": None,
         }
 
-        final_state = await article_graph.ainvoke(initial_state)
+        graph = get_article_graph()
+        final_state = await graph.ainvoke(initial_state)
 
         article_text = final_state.get("final_article", "")
         word_count = len(article_text.split())

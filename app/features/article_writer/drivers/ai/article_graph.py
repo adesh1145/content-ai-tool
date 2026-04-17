@@ -37,11 +37,7 @@ class ArticleState(TypedDict):
 
 
 def _get_llm():
-    provider = get_llm_provider()
-    from app.infrastructure.ai.llm_factory import OpenAIProvider, AnthropicProvider
-    if isinstance(provider, (OpenAIProvider, AnthropicProvider)):
-        return provider.get_langchain_llm()
-    raise RuntimeError("Unsupported provider")
+    return get_llm_provider().get_langchain_llm()
 
 
 async def research_node(state: ArticleState) -> ArticleState:
@@ -148,5 +144,11 @@ def build_article_graph() -> StateGraph:
     return graph.compile()
 
 
-# Compiled graph singleton
-article_graph = build_article_graph()
+_article_graph_instance = None
+
+def get_article_graph() -> StateGraph:
+    """Lazy-load the compiled article graph."""
+    global _article_graph_instance
+    if _article_graph_instance is None:
+        _article_graph_instance = build_article_graph()
+    return _article_graph_instance

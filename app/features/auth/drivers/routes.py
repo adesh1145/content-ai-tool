@@ -11,24 +11,27 @@ import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.core.exceptions import AuthenticationError, DomainException, DuplicateError, ValidationError
+from app.core.exceptions import AuthenticationError, DuplicateError, ValidationError
 from app.core.response import APIResponse
+from app.dependencies import get_current_user_id
 from app.features.auth.adapters.schemas import (
     CreateAPIKeyRequest,
     CreatedAPIKeyResponse,
     LoginRequest,
+    RefreshTokenRequest,
     RegisterRequest,
     RegisterResponse,
     TokenResponse,
+    AccessTokenResponse,
     UserProfileResponse,
 )
 from app.features.auth.adapters.user_gateway import UserGateway
 from app.features.auth.entities.user import APIKey
 from app.features.auth.use_cases.login_user import LoginInput, LoginUserUseCase
+from app.features.auth.use_cases.refresh_token import RefreshTokenInput, RefreshTokenUseCase
 from app.features.auth.use_cases.register_user import RegisterUserInput, RegisterUserUseCase
 from app.infrastructure.db.connection import get_db_session
 
@@ -36,19 +39,7 @@ settings = get_settings()
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-def _get_current_user_id(token: str) -> str:
-    """Decode JWT and return user_id (sub claim)."""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: str | None = payload.get("sub")
-        if not user_id:
-            raise AuthenticationError("Invalid token payload.")
-        return user_id
-    except JWTError as e:
-        raise AuthenticationError(f"Token validation failed: {e}") from e
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Public Endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=APIResponse[RegisterResponse], status_code=201)
 async def register(
@@ -99,19 +90,53 @@ async def login(
         raise HTTPException(status_code=401, detail=e.message)
 
 
+@router.post("/refresh", response_model=APIResponse[AccessTokenResponse])
+async def refresh_token(
+    body: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Get a new access token using a valid refresh token."""
+    try:
+        use_case = RefreshTokenUseCase(UserGateway(db))
+        result = await use_case.execute(RefreshTokenInput(refresh_token=body.refresh_token))
+        return APIResponse.ok(
+            AccessTokenResponse(
+                access_token=result.access_token,
+                token_type=result.token_type,
+                expires_in=result.expires_in,
+            )
+        )
+    except AuthenticationError as e:
+        raise HTTPException(status_code=401, detail=e.message)
+
+
+# ── Protected Endpoints (require JWT) ─────────────────────────────────────────
+
 @router.get("/me", response_model=APIResponse[UserProfileResponse])
 async def get_me(
-    token: str = Depends(lambda: None),  # Auth header handled by dependency
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """Get current authenticated user profile."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-    raise HTTPException(status_code=501, detail="Use Authorization: Bearer <token>")
+    gateway = UserGateway(db)
+    user = await gateway.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return APIResponse.ok(
+        UserProfileResponse(
+            user_id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            created_at=str(user.created_at),
+        )
+    )
 
 
 @router.post("/api-keys", response_model=APIResponse[CreatedAPIKeyResponse], status_code=201)
 async def create_api_key(
     body: CreateAPIKeyRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """Create a new API key. The raw key is shown ONCE — store it securely."""
@@ -119,9 +144,8 @@ async def create_api_key(
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     key_prefix = raw_key[:12]
 
-    # NOTE: In real usage this would require auth; simplified for scaffold
     api_key = APIKey(
-        user_id="demo-user",
+        user_id=user_id,
         name=body.name,
         key_hash=key_hash,
         key_prefix=key_prefix,

@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies import get_current_user_id
+
 from app.core.response import APIResponse
 from app.core.exceptions import ValidationError
 from app.features.blog_generator.adapters.schemas import (
@@ -30,6 +32,7 @@ router = APIRouter(prefix="/content/blog", tags=["Blog Generator"])
 @router.post("", response_model=APIResponse[BlogGenerateResponse], status_code=201)
 async def generate_blog(
     body: BlogGenerateRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """
@@ -49,7 +52,7 @@ async def generate_blog(
         )
         result = await use_case.execute(
             GenerateBlogInput(
-                user_id="demo-user",  # Replace with actual auth user
+                user_id=user_id,
                 topic=body.topic,
                 tone=body.tone,
                 language=body.language,
@@ -91,17 +94,19 @@ async def generate_blog(
 async def get_blog_history(
     limit: int = 20,
     offset: int = 0,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """Get current user's blog generation history."""
     gateway = BlogGateway(db)
-    blogs = await gateway.list_by_user("demo-user", limit=limit, offset=offset)
+    blogs = await gateway.list_by_user(user_id, limit=limit, offset=offset)
     return APIResponse.ok([{"id": b.id, "topic": b.topic, "title": b.title, "status": b.status.value} for b in blogs])
 
 
 @router.get("/{blog_id}", response_model=APIResponse[BlogGenerateResponse])
 async def get_blog(
     blog_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """Retrieve a specific generated blog post by ID."""

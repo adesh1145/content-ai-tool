@@ -42,13 +42,7 @@ class BlogAIService(IBlogAIService):
     """
 
     def __init__(self) -> None:
-        provider = get_llm_provider()
-        # Access raw LangChain LLM from our provider
-        from app.infrastructure.ai.llm_factory import OpenAIProvider, AnthropicProvider
-        if isinstance(provider, (OpenAIProvider, AnthropicProvider)):
-            self._llm = provider.get_langchain_llm()
-        else:
-            raise RuntimeError("Unsupported provider type for chain building.")
+        self._llm = get_llm_provider().get_langchain_llm()
 
     async def generate(self, request: BlogGenerationRequest) -> BlogGenerationResult:
         # ── Step 1: Generate Outline ──────────────────────────────────────────

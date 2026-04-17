@@ -12,6 +12,7 @@ import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies import get_current_user_id
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/seo", tags=["SEO Optimizer"])
 @router.post("/analyze", response_model=APIResponse[SEOAnalysisResponse], status_code=200)
 async def analyze_seo(
     body: SEOAnalyzeRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """
@@ -93,6 +95,7 @@ async def analyze_seo(
 @router.post("/meta", response_model=APIResponse[MetaGenerateResponse], status_code=201)
 async def generate_meta_tags(
     body: MetaGenerateRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """
@@ -100,12 +103,7 @@ async def generate_meta_tags(
     from any content. Follows Google's character guidelines.
     """
     from app.infrastructure.ai.llm_factory import get_llm_provider
-    provider = get_llm_provider()
-    from app.infrastructure.ai.llm_factory import OpenAIProvider, AnthropicProvider
-    if isinstance(provider, (OpenAIProvider, AnthropicProvider)):
-        llm = provider.get_langchain_llm()
-    else:
-        raise HTTPException(status_code=500, detail="LLM provider not available.")
+    llm = get_llm_provider().get_langchain_llm()
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", (

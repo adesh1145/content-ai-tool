@@ -9,10 +9,13 @@ from __future__ import annotations
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies import get_current_user_id
 
 from app.core.response import APIResponse
 from app.features.email_writer.adapters.schemas import EmailRequest, EmailResponse
+from app.features.email_writer.adapters.email_gateway import EmailGateway
 from app.features.email_writer.drivers.ai.email_chain import EmailAIService
+from app.features.email_writer.use_cases.generate_email import GenerateEmailInput, GenerateEmailUseCase
 from app.infrastructure.db.connection import get_db_session
 
 router = APIRouter(prefix="/content/email", tags=["Email Writer"])
@@ -23,6 +26,7 @@ VALID_EMAIL_TYPES = {"cold_email", "newsletter", "followup", "welcome"}
 @router.post("", response_model=APIResponse[EmailResponse], status_code=201)
 async def generate_email(
     body: EmailRequest,
+    user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
     """
@@ -39,8 +43,13 @@ async def generate_email(
         )
 
     try:
-        ai = EmailAIService()
-        result = await ai.generate(
+        use_case = GenerateEmailUseCase(
+            email_repo=EmailGateway(db),
+            ai_service=EmailAIService()
+        )
+        
+        result = await use_case.execute(GenerateEmailInput(
+            user_id=user_id,
             email_type=body.email_type,
             recipient_name=body.recipient_name,
             sender_company=body.sender_company,
@@ -48,17 +57,16 @@ async def generate_email(
             tone=body.tone,
             language=body.language,
             context=body.context,
-        )
+        ))
 
-        body_text = result.get("body", "")
         return APIResponse.ok(
             EmailResponse(
-                email_id=str(uuid.uuid4()),
-                email_type=body.email_type,
-                subject=result.get("subject", body.topic),
-                body=body_text,
-                word_count=len(body_text.split()),
-                tokens_used=len(body_text.split()) * 2,
+                email_id=result.email_id,
+                email_type=result.email_type,
+                subject=result.subject,
+                body=result.body,
+                word_count=len(result.body.split()),
+                tokens_used=result.tokens_used,
             ),
             message=f"{body.email_type.replace('_', ' ').title()} generated successfully.",
         )

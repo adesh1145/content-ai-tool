@@ -25,11 +25,11 @@ class APIResponse(BaseModel, Generic[DataT]):
     error_code: str | None = None
 
     @classmethod
-    def ok(cls, data: DataT, message: str = "Success") -> "APIResponse[DataT]":
+    def ok(cls, data: DataT, message: str = "Success") -> APIResponse[DataT]:
         return cls(success=True, data=data, message=message)
 
     @classmethod
-    def error(cls, message: str, error_code: str = "ERROR") -> "APIResponse[None]":
+    def error(cls, message: str, error_code: str = "ERROR") -> APIResponse[None]:
         return cls(success=False, data=None, message=message, error_code=error_code)
 
 

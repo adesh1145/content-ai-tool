@@ -22,12 +22,7 @@ from app.infrastructure.ai.llm_factory import get_llm_provider
 
 class SEOAnalysisService:
     def __init__(self) -> None:
-        provider = get_llm_provider()
-        from app.infrastructure.ai.llm_factory import OpenAIProvider, AnthropicProvider
-        if isinstance(provider, (OpenAIProvider, AnthropicProvider)):
-            self._llm = provider.get_langchain_llm()
-        else:
-            raise RuntimeError("Unsupported provider")
+        self._llm = get_llm_provider().get_langchain_llm()
 
     def _analyze_keyword(self, content: str, keyword: str) -> KeywordAnalysis:
         if not keyword:

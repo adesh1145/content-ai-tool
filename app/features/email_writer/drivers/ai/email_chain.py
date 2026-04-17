@@ -14,6 +14,7 @@ from __future__ import annotations
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from app.infrastructure.ai.llm_factory import get_llm_provider
+from app.features.email_writer.use_cases.interfaces.email_interfaces import IEmailAIService
 
 
 EMAIL_SYSTEM_PROMPTS = {
@@ -43,14 +44,9 @@ EMAIL_SYSTEM_PROMPTS = {
 }
 
 
-class EmailAIService:
+class EmailAIService(IEmailAIService):
     def __init__(self) -> None:
-        provider = get_llm_provider()
-        from app.infrastructure.ai.llm_factory import OpenAIProvider, AnthropicProvider
-        if isinstance(provider, (OpenAIProvider, AnthropicProvider)):
-            self._llm = provider.get_langchain_llm()
-        else:
-            raise RuntimeError("Unsupported provider")
+        self._llm = get_llm_provider().get_langchain_llm()
 
     async def generate(
         self,

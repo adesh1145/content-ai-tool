@@ -11,6 +11,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+import time
+import uuid
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -74,7 +77,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ── CORS ──────────────────────────────────────────────────────────────────
+    # ── Middlewares ───────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
@@ -82,6 +85,32 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def request_logging_middleware(request: Request, call_next):
+        request_id = str(uuid.uuid4())
+        start_time = time.perf_counter()
+        
+        logger.info(f"Incoming request {request.method} {request.url.path} [ID: {request_id}]")
+        
+        try:
+            response = await call_next(request)
+            process_time = time.perf_counter() - start_time
+            response.headers["X-Request-ID"] = request_id
+            response.headers["X-Process-Time"] = str(process_time)
+            
+            logger.info(
+                f"Completed request {request.method} {request.url.path} "
+                f"[ID: {request_id}] - Status: {response.status_code} - Time: {process_time:.4f}s"
+            )
+            return response
+        except Exception as e:
+            process_time = time.perf_counter() - start_time
+            logger.error(
+                f"Failed request {request.method} {request.url.path} "
+                f"[ID: {request_id}] - Error: {str(e)} - Time: {process_time:.4f}s"
+            )
+            raise
 
     # ── Exception Handlers ────────────────────────────────────────────────────
     @app.exception_handler(NotFoundError)

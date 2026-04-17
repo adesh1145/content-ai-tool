@@ -1,0 +1,903 @@
+# Refactor: Hexagonal Architecture + DDD + SOLID + Multi-LLM
+
+## Background & Problem Statement
+
+The current codebase uses a 4-layer Clean Architecture (entities → use_cases → adapters → drivers) which is a good start but has several gaps:
+
+1. **No proper DDD constructs** — missing Aggregates, Value Objects per feature, Domain Events, Domain Services, Factories
+2. **Single LLM provider** — only OpenAI/Anthropic via a global singleton; no per-feature or per-request LLM selection
+3. **Hexagonal ports/adapters not explicit** — input ports (driving) and output ports (driven) are mixed
+4. **Coupling in routes** — routes directly instantiate gateways and AI services instead of using a DI container
+5. **Shared concerns in `main.py`** — exception handlers, middleware, router registration all inline
+6. **Some features incomplete** — `project_manager`, `template_engine`, `usage_tracker` are skeleton-only
+7. **No domain events** — no event-driven communication between features
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Breaking Change**: This refactor changes every feature's directory structure. All imports will change. Existing tests will need updating.
+
+> [!WARNING]
+> **Multi-LLM**: Adding HuggingFace/Ollama requires new pip dependencies (`langchain-huggingface`, `langchain-ollama`). Confirm you want all providers installed.
+
+> [!IMPORTANT]
+> **Skeleton features**: `project_manager`, `template_engine`, `usage_tracker` currently have no implementation. Should I implement them fully, or keep them as structured skeletons in the new architecture?
+
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    DRIVING ADAPTERS (IN)                      │
+│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌─────────────┐ │
+│  │   API   │  │  CLI     │  │ Messaging │  │  Scheduler  │ │
+│  │ Router  │  │ Commands │  │ Consumer  │  │  (Celery)   │ │
+│  └────┬────┘  └────┬─────┘  └─────┬─────┘  └──────┬──────┘ │
+├───────┼────────────┼──────────────┼───────────────┼─────────┤
+│       └────────────┴──────┬───────┴───────────────┘         │
+│                    INPUT PORTS (IN)                           │
+│              ┌────────────┴────────────┐                     │
+│              │      USE CASES          │                     │
+│              │  (Application Layer)    │                     │
+│              └────────────┬────────────┘                     │
+│                    OUTPUT PORTS (OUT)                         │
+│       ┌───────────┬───────┴──────┬────────────┐             │
+├───────┼───────────┼──────────────┼────────────┼─────────────┤
+│  ┌────┴────┐ ┌────┴─────┐ ┌─────┴─────┐ ┌────┴──────┐      │
+│  │  DB     │ │  LLM     │ │  Event    │ │  Cache    │      │
+│  │  Repo   │ │  Gateway │ │  Publisher│ │  Gateway  │      │
+│  └─────────┘ └──────────┘ └───────────┘ └───────────┘      │
+│                    DRIVEN ADAPTERS (OUT)                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Proposed Changes
+
+### Phase 1: Core Shared Kernel
+
+Move cross-cutting concerns out of `main.py` into a proper `core/` shared kernel.
+
+---
+
+#### [MODIFY] [core/](file:///home/adesh-yadav/Desktop/content_tool/app/core) — Shared Kernel Restructure
+
+```
+app/core/
+├── __init__.py
+├── domain/
+│   ├── __init__.py
+│   ├── aggregate_root.py          # [NEW] Base AggregateRoot with domain events
+│   ├── base_entity.py             # [MOVE] from core/entities/
+│   ├── value_objects.py           # [MOVE] from core/entities/
+│   ├── domain_event.py            # [NEW] Base DomainEvent class
+│   └── domain_service.py          # [NEW] Base DomainService ABC
+│
+├── application/
+│   ├── __init__.py
+│   ├── base_use_case.py           # [MOVE] from core/interfaces/
+│   ├── base_command.py            # [NEW] CQRS Command base
+│   ├── base_query.py              # [NEW] CQRS Query base
+│   └── unit_of_work.py            # [NEW] UoW interface for transactions
+│
+├── port/
+│   ├── __init__.py
+│   ├── input/
+│   │   └── __init__.py            # Marker — feature ports go inside features
+│   └── output/
+│       ├── __init__.py
+│       ├── repository_port.py     # [MOVE+RENAME] from core/interfaces/base_repository.py
+│       ├── llm_port.py            # [MOVE+RENAME] from core/interfaces/llm_provider.py
+│       ├── event_publisher_port.py # [NEW] Domain event publishing port
+│       └── cache_port.py          # [NEW] Caching port
+│
+├── exception/
+│   ├── __init__.py
+│   ├── base_exception.py          # [MOVE+SPLIT] DomainException from exceptions.py
+│   ├── not_found.py               # [MOVE+SPLIT]
+│   ├── validation_error.py        # [MOVE+SPLIT]
+│   ├── authentication_error.py    # [MOVE+SPLIT]
+│   ├── authorization_error.py     # [MOVE+SPLIT]
+│   ├── quota_exceeded.py          # [MOVE+SPLIT]
+│   ├── llm_provider_error.py      # [MOVE+SPLIT]
+│   └── duplicate_error.py         # [MOVE+SPLIT]
+│
+├── exception_handler/
+│   ├── __init__.py
+│   └── fastapi_handlers.py        # [NEW] Extracted from main.py
+│
+├── middleware/
+│   ├── __init__.py
+│   ├── cors.py                    # [NEW] Extracted CORS setup
+│   ├── request_logging.py         # [NEW] Extracted request logging
+│   └── request_id.py              # [NEW] X-Request-ID middleware
+│
+├── response/
+│   ├── __init__.py
+│   └── api_response.py            # [MOVE] from core/response.py
+│
+├── router/
+│   ├── __init__.py
+│   └── registry.py                # [NEW] Centralized router registration
+│
+└── utils/
+    ├── __init__.py
+    └── logger.py                  # [KEEP]
+```
+
+**Key changes:**
+- `AggregateRoot` extends `BaseEntity` with `_domain_events: list[DomainEvent]` for event collection
+- Each exception gets its own file (SRP)
+- Exception handlers, middleware, router registration extracted from `main.py`
+- CQRS base classes (`BaseCommand`, `BaseQuery`) for input DTOs
+- `UnitOfWork` interface for transactional consistency
+
+---
+
+### Phase 2: Multi-LLM Provider System
+
+---
+
+#### [MODIFY] [infrastructure/ai/](file:///home/adesh-yadav/Desktop/content_tool/app/infrastructure/ai) — Multi-Provider LLM
+
+```
+app/infrastructure/ai/
+├── __init__.py
+├── llm_registry.py                # [NEW] Registry of all available providers
+├── llm_factory.py                 # [REFACTOR] Factory with provider registry
+├── providers/
+│   ├── __init__.py
+│   ├── openai_provider.py         # [MOVE+SPLIT] from llm_factory.py
+│   ├── anthropic_provider.py      # [MOVE+SPLIT] from llm_factory.py
+│   ├── google_provider.py         # [NEW] Google Gemini via langchain-google-genai
+│   ├── huggingface_provider.py    # [NEW] HuggingFace via langchain-huggingface
+│   └── ollama_provider.py         # [NEW] Ollama local models via langchain-ollama
+└── model_config.py                # [NEW] Per-feature model recommendations
+```
+
+**LLM Registry** design — allows per-feature LLM selection:
+
+```python
+# Example: feature can request a specific provider
+llm = llm_registry.get_provider("google", model="gemini-2.0-flash")
+llm = llm_registry.get_provider("ollama", model="llama3")
+llm = llm_registry.get_provider("huggingface", model="mistralai/Mistral-7B")
+```
+
+**Config additions** (`.env`):
+```env
+LLM_PROVIDER=openai                    # default provider
+GOOGLE_API_KEY=...
+GOOGLE_MODEL=gemini-2.0-flash
+HUGGINGFACE_API_KEY=...
+HUGGINGFACE_MODEL=mistralai/Mistral-7B
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
+```
+
+**`model_config.py`** — per-feature LLM recommendations:
+```python
+FEATURE_LLM_MAP = {
+    "blog_generator":       {"provider": "openai",    "model": "gpt-4o"},
+    "article_writer":       {"provider": "anthropic",  "model": "claude-3-5-sonnet"},
+    "social_media":         {"provider": "openai",    "model": "gpt-4o-mini"},
+    "ad_copy":              {"provider": "openai",    "model": "gpt-4o-mini"},
+    "product_description":  {"provider": "openai",    "model": "gpt-4o-mini"},
+    "email_writer":         {"provider": "anthropic",  "model": "claude-3-5-sonnet"},
+    "script_writer":        {"provider": "openai",    "model": "gpt-4o"},
+    "seo_optimizer":        {"provider": "google",    "model": "gemini-2.0-flash"},
+}
+```
+
+Each feature's AI adapter can override the default via config or per-request.
+
+---
+
+### Phase 3: Feature Refactoring (Hexagonal + DDD)
+
+Below is the **target structure for EVERY feature**. I show the full tree for `auth` and `blog_generator` as reference, then list file names for all other features.
+
+---
+
+#### Feature: `auth`
+
+```
+app/features/auth/
+├── __init__.py
+│
+├── domain/                              # CORE (pure business)
+│   ├── __init__.py
+│   ├── aggregate/
+│   │   ├── __init__.py
+│   │   └── user.py                      # User AggregateRoot (from entities/user.py)
+│   ├── entity/
+│   │   ├── __init__.py
+│   │   └── api_key.py                   # APIKey entity (extracted from user.py)
+│   ├── value_object/
+│   │   ├── __init__.py
+│   │   ├── email.py                     # Email VO with validation
+│   │   ├── password.py                  # HashedPassword VO
+│   │   └── user_plan.py                 # UserPlan enum (move from shared)
+│   ├── event/
+│   │   ├── __init__.py
+│   │   ├── user_registered_event.py     # [NEW]
+│   │   ├── user_logged_in_event.py      # [NEW]
+│   │   └── api_key_created_event.py     # [NEW]
+│   ├── exception/
+│   │   ├── __init__.py
+│   │   ├── invalid_credentials.py       # [NEW]
+│   │   └── user_not_found.py            # [NEW]
+│   ├── service/
+│   │   ├── __init__.py
+│   │   └── password_service.py          # [NEW] Domain service for hashing
+│   ├── factory/
+│   │   ├── __init__.py
+│   │   └── user_factory.py              # [NEW] Creates User aggregate
+│   └── repository/
+│       ├── __init__.py
+│       └── user_repository.py           # 🔴 OUTPUT PORT (abstract)
+│
+├── application/                         # USE CASES
+│   ├── __init__.py
+│   ├── port/
+│   │   ├── __init__.py
+│   │   ├── input/                       # 🔵 INPUT PORTS
+│   │   │   ├── __init__.py
+│   │   │   ├── register_user.py         # ABC for register
+│   │   │   ├── login_user.py            # ABC for login
+│   │   │   └── refresh_token.py         # ABC for refresh
+│   │   └── output/                      # 🔴 OUTPUT PORTS
+│   │       ├── __init__.py
+│   │       ├── user_repo_port.py        # Re-exports domain repo
+│   │       ├── token_service_port.py    # [NEW] JWT abstraction
+│   │       └── event_publisher_port.py  # [NEW]
+│   ├── usecase/
+│   │   ├── __init__.py
+│   │   ├── register_user_usecase.py     # [REFACTOR] from use_cases/register_user.py
+│   │   ├── login_user_usecase.py        # [REFACTOR] from use_cases/login_user.py
+│   │   └── refresh_token_usecase.py     # [REFACTOR] from use_cases/refresh_token.py
+│   ├── dto/
+│   │   ├── __init__.py
+│   │   ├── command/
+│   │   │   ├── __init__.py
+│   │   │   ├── register_command.py      # [NEW] replaces RegisterUserInput
+│   │   │   └── login_command.py         # [NEW] replaces LoginInput
+│   │   ├── query/
+│   │   │   ├── __init__.py
+│   │   │   └── get_user_query.py        # [NEW]
+│   │   └── response/
+│   │       ├── __init__.py
+│   │       ├── user_response.py         # [NEW]
+│   │       └── token_response.py        # [NEW]
+│   ├── mapper/
+│   │   ├── __init__.py
+│   │   └── user_mapper.py              # [NEW] Entity ↔ DTO mapping
+│   └── validator/
+│       ├── __init__.py
+│       └── register_validator.py        # [NEW] Input validation
+│
+├── adapter/                             # 🔶 ALL ADAPTERS
+│   ├── __init__.py
+│   ├── input/                           # DRIVING ADAPTERS
+│   │   ├── __init__.py
+│   │   └── api/
+│   │       ├── __init__.py
+│   │       ├── auth_router.py           # [REFACTOR] from drivers/routes.py
+│   │       └── auth_schemas.py          # [MOVE] from adapters/schemas.py
+│   └── output/                          # DRIVEN ADAPTERS
+│       ├── __init__.py
+│       ├── persistence/
+│       │   ├── __init__.py
+│       │   ├── user_model.py            # [MOVE] from drivers/models.py
+│       │   ├── user_mapper.py           # [NEW] ORM ↔ Entity mapper
+│       │   └── user_repository_impl.py  # [REFACTOR] from adapters/user_gateway.py
+│       ├── security/
+│       │   ├── __init__.py
+│       │   └── jwt_token_service.py     # [NEW] JWT impl of TokenServicePort
+│       └── messaging/
+│           ├── __init__.py
+│           └── auth_event_publisher.py  # [NEW]
+│
+└── config/
+    ├── __init__.py
+    └── dependency_container.py          # [NEW] DI wiring for this feature
+```
+
+---
+
+#### Feature: `blog_generator`
+
+```
+app/features/blog_generator/
+├── __init__.py
+│
+├── domain/
+│   ├── __init__.py
+│   ├── aggregate/
+│   │   ├── __init__.py
+│   │   └── blog_content.py             # BlogContent AggregateRoot
+│   ├── entity/
+│   │   ├── __init__.py
+│   │   └── seo_metadata.py             # SEOMetadata (extracted)
+│   ├── value_object/
+│   │   ├── __init__.py
+│   │   ├── blog_topic.py               # Topic VO with validation
+│   │   ├── word_count.py               # WordCount VO (300-5000)
+│   │   └── seo_slug.py                 # SEO slug VO
+│   ├── event/
+│   │   ├── __init__.py
+│   │   ├── blog_created_event.py
+│   │   ├── blog_completed_event.py
+│   │   └── blog_failed_event.py
+│   ├── exception/
+│   │   ├── __init__.py
+│   │   └── blog_generation_failed.py
+│   ├── service/
+│   │   ├── __init__.py
+│   │   └── blog_domain_service.py      # Readability scoring, word count
+│   ├── factory/
+│   │   ├── __init__.py
+│   │   └── blog_factory.py
+│   └── repository/
+│       ├── __init__.py
+│       └── blog_repository.py          # 🔴 PORT (OUT)
+│
+├── application/
+│   ├── __init__.py
+│   ├── port/
+│   │   ├── __init__.py
+│   │   ├── input/
+│   │   │   ├── __init__.py
+│   │   │   ├── generate_blog.py
+│   │   │   └── get_blog.py
+│   │   └── output/
+│   │       ├── __init__.py
+│   │       ├── blog_repo_port.py
+│   │       ├── blog_ai_port.py          # IBlogAIService
+│   │       └── event_publisher_port.py
+│   ├── usecase/
+│   │   ├── __init__.py
+│   │   ├── generate_blog_usecase.py
+│   │   ├── get_blog_usecase.py
+│   │   └── list_blogs_usecase.py
+│   ├── dto/
+│   │   ├── __init__.py
+│   │   ├── command/
+│   │   │   ├── __init__.py
+│   │   │   └── generate_blog_command.py
+│   │   ├── query/
+│   │   │   ├── __init__.py
+│   │   │   ├── get_blog_query.py
+│   │   │   └── list_blogs_query.py
+│   │   └── response/
+│   │       ├── __init__.py
+│   │       └── blog_response.py
+│   ├── mapper/
+│   │   ├── __init__.py
+│   │   └── blog_mapper.py
+│   └── validator/
+│       ├── __init__.py
+│       └── blog_validator.py
+│
+├── adapter/
+│   ├── __init__.py
+│   ├── input/
+│   │   ├── __init__.py
+│   │   └── api/
+│   │       ├── __init__.py
+│   │       ├── blog_router.py
+│   │       └── blog_schemas.py
+│   └── output/
+│       ├── __init__.py
+│       ├── persistence/
+│       │   ├── __init__.py
+│       │   ├── blog_model.py
+│       │   ├── blog_orm_mapper.py
+│       │   └── blog_repository_impl.py
+│       ├── ai/
+│       │   ├── __init__.py
+│       │   └── blog_ai_service.py       # LangChain chain (uses LLM registry)
+│       └── messaging/
+│           ├── __init__.py
+│           └── blog_event_publisher.py
+│
+└── config/
+    ├── __init__.py
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `article_writer`
+
+```
+app/features/article_writer/
+├── domain/
+│   ├── aggregate/
+│   │   └── article.py
+│   ├── value_object/
+│   │   └── article_topic.py
+│   ├── event/
+│   │   ├── article_started_event.py
+│   │   └── article_completed_event.py
+│   ├── exception/
+│   │   └── article_generation_failed.py
+│   ├── service/
+│   │   └── article_domain_service.py
+│   ├── factory/
+│   │   └── article_factory.py
+│   └── repository/
+│       └── article_repository.py
+├── application/
+│   ├── port/
+│   │   ├── input/
+│   │   │   └── generate_article.py
+│   │   └── output/
+│   │       ├── article_repo_port.py
+│   │       └── article_ai_port.py
+│   ├── usecase/
+│   │   ├── generate_article_usecase.py
+│   │   └── get_article_usecase.py
+│   ├── dto/
+│   │   ├── command/
+│   │   │   └── generate_article_command.py
+│   │   ├── query/
+│   │   │   └── get_article_query.py
+│   │   └── response/
+│   │       └── article_response.py
+│   ├── mapper/
+│   │   └── article_mapper.py
+│   └── validator/
+│       └── article_validator.py
+├── adapter/
+│   ├── input/
+│   │   └── api/
+│   │       ├── article_router.py
+│   │       └── article_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── article_model.py
+│       │   ├── article_orm_mapper.py
+│       │   └── article_repository_impl.py
+│       └── ai/
+│           └── article_graph_service.py   # LangGraph (multi-step)
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `social_media`
+
+```
+app/features/social_media/
+├── domain/
+│   ├── aggregate/
+│   │   └── social_post.py
+│   ├── value_object/
+│   │   ├── platform.py              # SocialPlatform enum + char limits
+│   │   └── hashtag.py
+│   ├── event/
+│   │   └── social_post_created_event.py
+│   ├── exception/
+│   │   └── platform_limit_exceeded.py
+│   ├── service/
+│   │   └── platform_rules_service.py  # Char limits, hashtag rules
+│   ├── factory/
+│   │   └── social_post_factory.py
+│   └── repository/
+│       └── social_post_repository.py
+├── application/
+│   ├── port/input/
+│   │   └── generate_social_post.py
+│   ├── port/output/
+│   │   ├── social_repo_port.py
+│   │   └── social_ai_port.py
+│   ├── usecase/
+│   │   ├── generate_social_post_usecase.py
+│   │   └── list_social_posts_usecase.py
+│   ├── dto/command/
+│   │   └── generate_social_command.py
+│   ├── dto/query/
+│   │   └── list_social_query.py
+│   ├── dto/response/
+│   │   └── social_post_response.py
+│   ├── mapper/
+│   │   └── social_mapper.py
+│   └── validator/
+│       └── social_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── social_router.py
+│   │   └── social_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── social_model.py
+│       │   ├── social_orm_mapper.py
+│       │   └── social_repository_impl.py
+│       └── ai/
+│           └── social_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `ad_copy`
+
+```
+app/features/ad_copy/
+├── domain/
+│   ├── aggregate/
+│   │   └──  ad.py
+│   ├── entity/
+│   │   └── ad_variation.py
+│   ├── value_object/
+│   │   └── ad_platform.py
+│   ├── event/
+│   │   └── ad_generated_event.py
+│   ├── exception/
+│   │   └── ad_generation_failed.py
+│   ├── service/
+│   │   └── ad_rules_service.py        # AIDA/PAS framework rules
+│   ├── factory/
+│   │   └── ad_factory.py
+│   └── repository/
+│       └── ad_repository.py
+├── application/
+│   ├── port/input/
+│   │   └── generate_ad_copy.py
+│   ├── port/output/
+│   │   ├── ad_repo_port.py
+│   │   └── ad_ai_port.py
+│   ├── usecase/
+│   │   └── generate_ad_copy_usecase.py
+│   ├── dto/command/
+│   │   └── generate_ad_command.py
+│   ├── dto/response/
+│   │   └── ad_response.py
+│   ├── mapper/
+│   │   └── ad_mapper.py
+│   └── validator/
+│       └── ad_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── ad_router.py
+│   │   └── ad_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── ad_model.py
+│       │   ├── ad_orm_mapper.py
+│       │   └── ad_repository_impl.py
+│       └── ai/
+│           └── ad_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `product_description`
+
+```
+app/features/product_description/
+├── domain/
+│   ├── aggregate/
+│   │   └── product_description.py
+│   ├── value_object/
+│   │   └── product_category.py
+│   ├── event/
+│   │   └── product_desc_created_event.py
+│   ├── service/
+│   │   └── fab_framework_service.py   # F-A-B domain rules
+│   ├── factory/
+│   │   └── product_factory.py
+│   └── repository/
+│       └── product_repository.py
+├── application/
+│   ├── port/input/
+│   │   └── generate_product_desc.py
+│   ├── port/output/
+│   │   ├── product_repo_port.py
+│   │   └── product_ai_port.py
+│   ├── usecase/
+│   │   └── generate_product_desc_usecase.py
+│   ├── dto/command/
+│   │   └── generate_product_command.py
+│   ├── dto/response/
+│   │   └── product_response.py
+│   ├── mapper/
+│   │   └── product_mapper.py
+│   └── validator/
+│       └── product_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── product_router.py
+│   │   └── product_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── product_model.py
+│       │   ├── product_orm_mapper.py
+│       │   └── product_repository_impl.py
+│       └── ai/
+│           └── product_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `email_writer`
+
+```
+app/features/email_writer/
+├── domain/
+│   ├── aggregate/
+│   │   └── email.py
+│   ├── value_object/
+│   │   └── email_type.py
+│   ├── event/
+│   │   └── email_generated_event.py
+│   ├── service/
+│   │   └── email_template_service.py  # AIDA/PAS for emails
+│   ├── factory/
+│   │   └── email_factory.py
+│   └── repository/
+│       └── email_repository.py
+├── application/
+│   ├── port/input/
+│   │   └── generate_email.py
+│   ├── port/output/
+│   │   ├── email_repo_port.py
+│   │   └── email_ai_port.py
+│   ├── usecase/
+│   │   └── generate_email_usecase.py
+│   ├── dto/command/
+│   │   └── generate_email_command.py
+│   ├── dto/response/
+│   │   └── email_response.py
+│   ├── mapper/
+│   │   └── email_mapper.py
+│   └── validator/
+│       └── email_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── email_router.py
+│   │   └── email_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── email_model.py
+│       │   ├── email_orm_mapper.py
+│       │   └── email_repository_impl.py
+│       └── ai/
+│           └── email_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `script_writer`
+
+```
+app/features/script_writer/
+├── domain/
+│   ├── aggregate/
+│   │   └── script.py
+│   ├── value_object/
+│   │   ├── script_format.py
+│   │   └── duration.py
+│   ├── event/
+│   │   └── script_generated_event.py
+│   ├── service/
+│   │   └── duration_estimator.py      # Word count → duration
+│   ├── factory/
+│   │   └── script_factory.py
+│   └── repository/
+│       └── script_repository.py
+├── application/
+│   ├── port/input/
+│   │   └── generate_script.py
+│   ├── port/output/
+│   │   ├── script_repo_port.py
+│   │   └── script_ai_port.py
+│   ├── usecase/
+│   │   └── generate_script_usecase.py
+│   ├── dto/command/
+│   │   └── generate_script_command.py
+│   ├── dto/response/
+│   │   └── script_response.py
+│   ├── mapper/
+│   │   └── script_mapper.py
+│   └── validator/
+│       └── script_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── script_router.py
+│   │   └── script_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── script_model.py
+│       │   ├── script_orm_mapper.py
+│       │   └── script_repository_impl.py
+│       └── ai/
+│           └── script_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Feature: `seo_optimizer`
+
+```
+app/features/seo_optimizer/
+├── domain/
+│   ├── aggregate/
+│   │   └── seo_analysis.py
+│   ├── entity/
+│   │   └── keyword_analysis.py
+│   ├── value_object/
+│   │   └── seo_score.py
+│   ├── event/
+│   │   └── seo_analysis_completed_event.py
+│   ├── service/
+│   │   ├── readability_service.py     # textstat logic
+│   │   └── keyword_density_service.py
+│   ├── factory/
+│   │   └── seo_factory.py
+│   └── repository/
+│       └── seo_repository.py
+├── application/
+│   ├── port/input/
+│   │   ├── analyze_seo.py
+│   │   └── generate_meta.py
+│   ├── port/output/
+│   │   ├── seo_repo_port.py
+│   │   └── seo_ai_port.py
+│   ├── usecase/
+│   │   ├── analyze_seo_usecase.py
+│   │   └── generate_meta_usecase.py
+│   ├── dto/command/
+│   │   ├── analyze_seo_command.py
+│   │   └── generate_meta_command.py
+│   ├── dto/response/
+│   │   ├── seo_analysis_response.py
+│   │   └── meta_response.py
+│   ├── mapper/
+│   │   └── seo_mapper.py
+│   └── validator/
+│       └── seo_validator.py
+├── adapter/
+│   ├── input/api/
+│   │   ├── seo_router.py
+│   │   └── seo_schemas.py
+│   └── output/
+│       ├── persistence/
+│       │   ├── seo_model.py
+│       │   └── seo_repository_impl.py
+│       └── ai/
+│           └── seo_ai_service.py
+└── config/
+    └── dependency_container.py
+```
+
+---
+
+#### Features: `usage_tracker`, `project_manager`, `template_engine`
+
+Same structure pattern — skeleton files with proper ports and adapters. Full implementation in later phase.
+
+---
+
+### Phase 4: Infrastructure Updates
+
+#### [MODIFY] [infrastructure/](file:///home/adesh-yadav/Desktop/content_tool/app/infrastructure)
+
+```
+app/infrastructure/
+├── __init__.py
+├── ai/                   # (see Phase 2 above)
+├── db/
+│   ├── __init__.py
+│   ├── base_model.py     # [KEEP]
+│   ├── connection.py     # [KEEP]
+│   └── unit_of_work.py   # [NEW] SQLAlchemy UoW implementation
+├── cache/
+│   ├── __init__.py
+│   └── redis_cache.py    # [NEW] ICachePort impl
+├── celery/
+│   ├── __init__.py
+│   └── worker.py         # [KEEP]
+└── messaging/
+    ├── __init__.py
+    └── in_memory_event_bus.py  # [NEW] Simple event bus
+```
+
+---
+
+### Phase 5: Refactored `main.py` and `dependencies.py`
+
+#### [MODIFY] [main.py](file:///home/adesh-yadav/Desktop/content_tool/app/main.py)
+
+Becomes minimal — delegates to core modules:
+
+```python
+# main.py (target — ~30 lines)
+from app.core.middleware.cors import setup_cors
+from app.core.middleware.request_logging import setup_request_logging
+from app.core.exception_handler.fastapi_handlers import register_exception_handlers
+from app.core.router.registry import register_all_routers
+
+def create_app() -> FastAPI:
+    app = FastAPI(...)
+    setup_cors(app)
+    setup_request_logging(app)
+    register_exception_handlers(app)
+    register_all_routers(app)
+    return app
+```
+
+#### [MODIFY] [dependencies.py](file:///home/adesh-yadav/Desktop/content_tool/app/dependencies.py)
+
+Add multi-LLM dependency:
+
+```python
+def get_llm(provider: str | None = None, model: str | None = None) -> ILLMProvider:
+    return llm_registry.get_provider(provider, model)
+```
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **Skeleton features**: Should `project_manager`, `template_engine`, `usage_tracker` be fully implemented or left as structured skeletons?
+
+> [!IMPORTANT]
+> 2. **LLM providers**: Which providers do you definitely want included? (OpenAI ✅, Anthropic ✅, Google Gemini, HuggingFace, Ollama — all?)
+
+> [!IMPORTANT]
+> 3. **Database migration**: Should I create Alembic migrations for any new models, or handle that separately?
+
+> [!IMPORTANT]
+> 4. **Per-request LLM**: Should users be able to pass `llm_provider` in the API request body to override the default per-feature LLM?
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# After each phase, verify:
+cd /home/adesh-yadav/Desktop/content_tool
+python -m pytest tests/ -v --tb=short
+python -c "from app.main import create_app; print('✅ App loads')"
+uvicorn app.main:app --host 0.0.0.0 --port 8000  # Smoke test
+```
+
+### Manual Verification
+- Import chain validation: no inner layer imports outer
+- Each feature's `dependency_container.py` wires correctly
+- `/docs` endpoint shows all routes
+- Health check returns LLM provider info
+
+---
+
+## Execution Order
+
+| Phase | Scope | Est. Files |
+|-------|-------|-----------|
+| 1 | Core shared kernel refactor | ~25 files |
+| 2 | Multi-LLM provider system | ~8 files |
+| 3a | Auth feature (reference impl) | ~30 files |
+| 3b | Blog generator (reference impl) | ~30 files |
+| 3c | Remaining 6 content features | ~150 files |
+| 3d | Skeleton features (3) | ~45 files |
+| 4 | Infrastructure (UoW, events, cache) | ~6 files |
+| 5 | main.py + dependencies.py cleanup | ~5 files |
+| 6 | Tests + migration | ~20 files |

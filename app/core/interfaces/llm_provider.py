@@ -49,3 +49,14 @@ class ILLMProvider(ABC):
     def get_model_name(self) -> str:
         """Return the model identifier string."""
         ...
+
+    @abstractmethod
+    def get_langchain_llm(self):
+        """
+        Return the underlying LangChain BaseChatModel instance.
+
+        Used by AI service implementations (drivers/ai/) to build
+        LangChain chains and LangGraph graphs. This is scoped to
+        Layer 4 only — use cases must NEVER call this.
+        """
+        ...
