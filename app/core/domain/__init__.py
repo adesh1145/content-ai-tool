@@ -1,1 +1,0 @@
-# Core Domain — Shared Kernel

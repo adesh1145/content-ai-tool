@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.features.auth.adapter.outbound.messaging.publisher import AuthEventPublisher
+from app.features.auth.adapter.outbound.persistence.repository import SQLAlchemyUserRepository
+from app.features.auth.adapter.outbound.security.jwt_token_service import JWTTokenService
+from app.features.auth.application.service.login_user_service import LoginUserService
+from app.features.auth.application.service.refresh_token_service import RefreshTokenService
+from app.features.auth.application.service.register_user_service import RegisterUserService
+
+
+class AuthContainer:
+    """Per-request DI container for the Auth bounded context.
+
+    Usage in routes::
+
+        container = AuthContainer(db_session)
+        result = await container.register_use_case.execute(command)
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+        self._user_repo = SQLAlchemyUserRepository(session)
+        self._token_service = JWTTokenService()
+        self._event_publisher = AuthEventPublisher()
+
+    @property
+    def user_repo(self) -> SQLAlchemyUserRepository:
+        return self._user_repo
+
+    @property
+    def event_publisher(self) -> AuthEventPublisher:
+        return self._event_publisher
+
+    @property
+    def token_service(self) -> JWTTokenService:
+        return self._token_service
+
+    @property
+    def register_use_case(self) -> RegisterUserService:
+        return RegisterUserService(
+            user_repo=self._user_repo,
+            event_publisher=self._event_publisher,
+        )
+
+    @property
+    def login_use_case(self) -> LoginUserService:
+        return LoginUserService(
+            user_repo=self._user_repo,
+            token_service=self._token_service,
+            event_publisher=self._event_publisher,
+        )
+
+    @property
+    def refresh_use_case(self) -> RefreshTokenService:
+        return RefreshTokenService(
+            user_repo=self._user_repo,
+            token_service=self._token_service,
+        )
