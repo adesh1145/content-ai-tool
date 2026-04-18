@@ -42,15 +42,15 @@ async def lifespan(app: FastAPI):
 def _register_feature_routers(app: FastAPI) -> None:
     prefix = settings.API_PREFIX
 
-    from app.features.auth.adapter.inbound.web.controller import router as auth_router
-    from app.features.blog_generator.adapter.inbound.web.controller import router as blog_router
-    from app.features.article_writer.adapter.inbound.web.controller import router as article_router
-    from app.features.social_media.adapter.inbound.web.controller import router as social_router
-    from app.features.ad_copy.adapter.inbound.web.controller import router as ad_router
-    from app.features.product_description.adapter.inbound.web.controller import router as product_router
-    from app.features.email_writer.adapter.inbound.web.controller import router as email_router
-    from app.features.script_writer.adapter.inbound.web.controller import router as script_router
-    from app.features.seo_optimizer.adapter.inbound.web.controller import router as seo_router
+    from app.features.auth.presentation.rest.controller import router as auth_router
+    from app.features.blog_generator.presentation.rest.controller import router as blog_router
+    from app.features.article_writer.presentation.rest.controller import router as article_router
+    from app.features.social_media.presentation.rest.controller import router as social_router
+    from app.features.ad_copy.presentation.rest.controller import router as ad_router
+    from app.features.product_description.presentation.rest.controller import router as product_router
+    from app.features.email_writer.presentation.rest.controller import router as email_router
+    from app.features.script_writer.presentation.rest.controller import router as script_router
+    from app.features.seo_optimizer.presentation.rest.controller import router as seo_router
 
     app.include_router(auth_router, prefix=prefix)
     app.include_router(blog_router, prefix=prefix)

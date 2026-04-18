@@ -1,3 +1,3 @@
-from app.features.seo_optimizer.adapter.inbound.web.controller import router
+from app.features.seo_optimizer.presentation.rest.controller import router
 
 __all__ = ["router"]

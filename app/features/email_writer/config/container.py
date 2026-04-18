@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.email_writer.adapter.outbound.ai.service import EmailAIService
-from app.features.email_writer.adapter.outbound.messaging.publisher import EmailEventPublisher
-from app.features.email_writer.adapter.outbound.persistence.repository import EmailRepositoryImpl
+from app.features.email_writer.infrastructure.ai.service import EmailAIService
+from app.features.email_writer.infrastructure.messaging.publisher import EmailEventPublisher
+from app.features.email_writer.infrastructure.persistence.repository import EmailRepositoryImpl
 from app.features.email_writer.application.service.generate_email_service import GenerateEmailService
 
 

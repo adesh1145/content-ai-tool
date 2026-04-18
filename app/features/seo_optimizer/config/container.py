@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.seo_optimizer.adapter.outbound.ai.service import SEOAIService
-from app.features.seo_optimizer.adapter.outbound.messaging.publisher import SEOEventPublisher
-from app.features.seo_optimizer.adapter.outbound.persistence.repository import (
+from app.features.seo_optimizer.infrastructure.ai.service import SEOAIService
+from app.features.seo_optimizer.infrastructure.messaging.publisher import SEOEventPublisher
+from app.features.seo_optimizer.infrastructure.persistence.repository import (
     SEORepositoryImpl,
 )
 from app.features.seo_optimizer.application.service.analyze_seo_service import (

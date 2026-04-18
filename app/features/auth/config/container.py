@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.auth.adapter.outbound.messaging.publisher import AuthEventPublisher
-from app.features.auth.adapter.outbound.persistence.repository import SQLAlchemyUserRepository
-from app.features.auth.adapter.outbound.security.jwt_token_service import JWTTokenService
+from app.features.auth.infrastructure.messaging.publisher import AuthEventPublisher
+from app.features.auth.infrastructure.persistence.repository import SQLAlchemyUserRepository
+from app.features.auth.infrastructure.security.jwt_token_service import JWTTokenService
 from app.features.auth.application.service.login_user_service import LoginUserService
 from app.features.auth.application.service.refresh_token_service import RefreshTokenService
 from app.features.auth.application.service.register_user_service import RegisterUserService

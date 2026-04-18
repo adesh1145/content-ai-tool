@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.product_description.adapter.outbound.ai.service import ProductAIService
-from app.features.product_description.adapter.outbound.messaging.publisher import ProductEventPublisher
-from app.features.product_description.adapter.outbound.persistence.repository import ProductRepositoryImpl
+from app.features.product_description.infrastructure.ai.service import ProductAIService
+from app.features.product_description.infrastructure.messaging.publisher import ProductEventPublisher
+from app.features.product_description.infrastructure.persistence.repository import ProductRepositoryImpl
 from app.features.product_description.application.service.generate_product_service import GenerateProductService
 
 

@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.blog_generator.adapter.outbound.ai.service import BlogAIService
-from app.features.blog_generator.adapter.outbound.messaging.publisher import BlogEventPublisher
-from app.features.blog_generator.adapter.outbound.persistence.repository import SQLAlchemyBlogRepository
+from app.features.blog_generator.infrastructure.ai.service import BlogAIService
+from app.features.blog_generator.infrastructure.messaging.publisher import BlogEventPublisher
+from app.features.blog_generator.infrastructure.persistence.repository import SQLAlchemyBlogRepository
 from app.features.blog_generator.application.service.generate_blog_service import GenerateBlogService
 from app.features.blog_generator.application.service.get_blog_service import GetBlogService
 from app.features.blog_generator.application.service.list_blogs_service import ListBlogsService

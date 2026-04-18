@@ -1,3 +1,3 @@
-from app.features.auth.adapter.inbound.web.controller import router
+from app.features.auth.presentation.rest.controller import router
 
 __all__ = ["router"]

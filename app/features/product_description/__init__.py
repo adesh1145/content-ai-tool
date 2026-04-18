@@ -1,3 +1,3 @@
-from app.features.product_description.adapter.inbound.web.controller import router
+from app.features.product_description.presentation.rest.controller import router
 
 __all__ = ["router"]

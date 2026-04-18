@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.article_writer.adapter.outbound.ai.service import (
+from app.features.article_writer.infrastructure.ai.service import (
     ArticleGraphService,
 )
-from app.features.article_writer.adapter.outbound.messaging.publisher import (
+from app.features.article_writer.infrastructure.messaging.publisher import (
     ArticleEventPublisher,
 )
-from app.features.article_writer.adapter.outbound.persistence.repository import (
+from app.features.article_writer.infrastructure.persistence.repository import (
     ArticleRepositoryImpl,
 )
 from app.features.article_writer.application.service.generate_article_service import (

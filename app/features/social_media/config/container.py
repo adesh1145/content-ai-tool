@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.social_media.adapter.outbound.ai.service import SocialAIService
-from app.features.social_media.adapter.outbound.messaging.publisher import (
+from app.features.social_media.infrastructure.ai.service import SocialAIService
+from app.features.social_media.infrastructure.messaging.publisher import (
     SocialEventPublisher,
 )
-from app.features.social_media.adapter.outbound.persistence.repository import (
+from app.features.social_media.infrastructure.persistence.repository import (
     SocialRepositoryImpl,
 )
 from app.features.social_media.application.service.generate_social_service import (

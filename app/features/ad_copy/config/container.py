@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.ad_copy.adapter.outbound.ai.service import AdCopyAIService
-from app.features.ad_copy.adapter.outbound.messaging.publisher import AdCopyEventPublisher
-from app.features.ad_copy.adapter.outbound.persistence.repository import AdCopyRepositoryImpl
+from app.features.ad_copy.infrastructure.ai.service import AdCopyAIService
+from app.features.ad_copy.infrastructure.messaging.publisher import AdCopyEventPublisher
+from app.features.ad_copy.infrastructure.persistence.repository import AdCopyRepositoryImpl
 from app.features.ad_copy.application.service.generate_ad_service import GenerateAdService
 
 

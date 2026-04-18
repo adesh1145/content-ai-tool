@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.script_writer.adapter.outbound.ai.service import ScriptAIService
-from app.features.script_writer.adapter.outbound.messaging.publisher import (
+from app.features.script_writer.infrastructure.ai.service import ScriptAIService
+from app.features.script_writer.infrastructure.messaging.publisher import (
     ScriptEventPublisher,
 )
-from app.features.script_writer.adapter.outbound.persistence.repository import (
+from app.features.script_writer.infrastructure.persistence.repository import (
     ScriptRepositoryImpl,
 )
 from app.features.script_writer.application.service.generate_script_service import (
