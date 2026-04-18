@@ -8,7 +8,7 @@ from app.features.auth.application.validator.register_validator import RegisterV
 from app.features.auth.domain.event.user_registered_event import UserRegisteredEvent
 from app.features.auth.domain.model.email import Email
 from app.features.auth.domain.model.user import User
-from app.features.auth.domain.port.inbound.register_user_port import IRegisterUser
+from app.features.auth.application.port.inbound.register_user_port import IRegisterUser
 from app.features.auth.domain.port.outbound.user_repository_port import IUserRepository
 from app.features.auth.domain.service.password_service import PasswordService
 

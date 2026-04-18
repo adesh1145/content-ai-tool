@@ -19,7 +19,9 @@ networks:
 # ── Named volumes (persistent data) ──────────────────────────────────────────
 volumes:
   postgres_data:
+    name: ${DOCKER_VOLUME_PREFIX:-dev}_postgres_data
   redis_data:
+    name: ${DOCKER_VOLUME_PREFIX:-dev}_redis_data
 
 # ── Base app config (DRY — reused by app and celery) ─────────────────────────
 x-app-base: &app-base
@@ -28,7 +30,7 @@ x-app-base: &app-base
     dockerfile: Dockerfile
     target: runner
   env_file:
-    - .env
+    - .env.dev
   environment:
     # Override database to use PostgreSQL (not SQLite) in Docker
     - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-content_tool_db}
@@ -42,6 +44,10 @@ x-app-base: &app-base
       condition: service_healthy
   networks:
     - content_ai_net
+  volumes:
+    - ./logs:/app/logs
+    - ./app:/app/app
+    - ./pyproject.toml:/app/pyproject.toml
   restart: unless-stopped
 
 # ── Services ──────────────────────────────────────────────────────────────────
@@ -52,16 +58,14 @@ services:
     <<: *app-base
     container_name: content_ai_app
     ports:
-      - "8000:8000"
-    volumes:
-      - ./logs:/app/logs         # Persist logs to host
+      - "${APP_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # ── Celery Worker ───────────────────────────────────────────────────────────
   celery:
@@ -94,13 +98,11 @@ services:
     image: postgres:16-alpine
     container_name: content_ai_db
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-content_tool_db}
+      POSTGRES_DB: ${POSTGRES_DB:-content_tool_dev_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"             # Expose only for local dev inspection
     networks:
       - content_ai_net
     healthcheck:
@@ -110,6 +112,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── pgAdmin (PostgreSQL GUI) ────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: content_ai_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - content_ai_net
+    restart: unless-stopped
+
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -117,8 +135,6 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"             # Expose only for local dev inspection
     networks:
       - content_ai_net
     healthcheck:

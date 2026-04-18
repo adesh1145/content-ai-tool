@@ -1,3 +1,8 @@
+"""
+Driven adapter: social media content generation.
+Uses the LLM configured in SOCIAL_MEDIA_LLM from model_config.py.
+"""
+
 from __future__ import annotations
 
 import re
@@ -10,6 +15,7 @@ from app.features.social_media.domain.port.outbound.social_ai_port import (
     SocialAIResult,
 )
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import SOCIAL_MEDIA_LLM
 
 PLATFORM_PROMPTS: dict[str, str] = {
     "linkedin": (
@@ -32,13 +38,11 @@ PLATFORM_PROMPTS: dict[str, str] = {
 
 
 class SocialAIService(ISocialAIService):
-    """Driven adapter — generates social-media content using LangChain + LLM registry."""
+    """Driven adapter — generates social-media content. Model from model_config.py."""
 
-    def __init__(
-        self, provider: str = "openai", model: str | None = None
-    ) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        step = SOCIAL_MEDIA_LLM.get_step("generate")
+        self._llm = get_llm_registry().get_langchain_llm(step.provider, step.model)
 
     async def generate(
         self,

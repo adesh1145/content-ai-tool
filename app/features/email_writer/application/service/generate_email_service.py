@@ -7,7 +7,7 @@ from app.features.email_writer.application.result.email_result import EmailResul
 from app.features.email_writer.application.validator.email_validator import EmailValidator
 from app.features.email_writer.domain.exception.email_generation_failed import EmailGenerationFailed
 from app.features.email_writer.domain.model.email_content import EmailContent
-from app.features.email_writer.domain.port.inbound.generate_email_port import GenerateEmailPort
+from app.features.email_writer.application.port.inbound.generate_email_port import GenerateEmailPort
 from app.features.email_writer.domain.port.outbound.email_ai_port import EmailAIPort
 from app.features.email_writer.domain.port.outbound.email_repository_port import EmailRepositoryPort
 

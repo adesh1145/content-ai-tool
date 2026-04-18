@@ -1,5 +1,6 @@
 """
 Driven adapter: LangChain ad copy generation using platform-specific prompts.
+Uses the LLM configured in AD_COPY_LLM from model_config.py.
 
 Google Ads  -> AIDA framework (Attention-Interest-Desire-Action), headline <=30 chars
 Facebook Ads -> PAS framework (Problem-Agitate-Solution), emotionally compelling
@@ -15,6 +16,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.features.ad_copy.domain.port.outbound.ad_ai_port import AdAIPort
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import AD_COPY_LLM
 
 _GOOGLE_SYSTEM = (
     "You are a Google Ads specialist using the AIDA framework "
@@ -45,17 +47,11 @@ _HUMAN_PROMPT = (
 
 
 class AdCopyAIService(AdAIPort):
-    """
-    Implements AdAIPort using LangChain with the LLM registry.
+    """Implements AdAIPort. Model from model_config.py."""
 
-    Selects the appropriate prompt template based on platform:
-    - google  -> AIDA framework
-    - facebook -> PAS framework
-    """
-
-    def __init__(self, provider: str = "openai", model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        step = AD_COPY_LLM.get_step("generate")
+        self._llm = get_llm_registry().get_langchain_llm(step.provider, step.model)
 
     async def generate(
         self,

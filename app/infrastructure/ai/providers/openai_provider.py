@@ -1,9 +1,17 @@
+"""
+OpenAI LLM provider — requires explicit model name.
+
+Usage:
+    provider = OpenAIProvider(model="gpt-4o")
+    provider = OpenAIProvider(model="gpt-4o-mini")
+"""
+
 from __future__ import annotations
+
+import logging
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-
-import logging
 
 from app.common.config.settings import get_settings
 from app.common.port.outbound.llm_port import LLMPort, LLMResponse
@@ -12,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(LLMPort):
-    """OpenAI LLM provider via LangChain."""
+    """OpenAI LLM provider via LangChain. Model MUST be specified."""
 
-    def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
+    def __init__(self, model: str, api_key: str | None = None) -> None:
         settings = get_settings()
-        self._model = model or settings.OPENAI_MODEL
+        self._model = model
         self._llm = ChatOpenAI(
             model=self._model,
             temperature=settings.LLM_TEMPERATURE,
@@ -37,7 +45,7 @@ class OpenAIProvider(LLMPort):
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
 
-        logger.debug(f"[OpenAI] Calling {self._model}, prompt_len={len(prompt)}")
+        logger.debug("[OpenAI] Calling %s, prompt_len=%d", self._model, len(prompt))
         response = await self._llm.ainvoke(messages)
 
         usage = response.usage_metadata or {}

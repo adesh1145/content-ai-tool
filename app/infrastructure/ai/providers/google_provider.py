@@ -1,3 +1,11 @@
+"""
+Google Gemini LLM provider — requires explicit model name.
+
+Usage:
+    provider = GoogleProvider(model="gemini-2.0-flash")
+    provider = GoogleProvider(model="gemini-1.5-pro")
+"""
+
 from __future__ import annotations
 
 import logging
@@ -9,21 +17,23 @@ logger = logging.getLogger(__name__)
 
 
 class GoogleProvider(LLMPort):
-    """Google Gemini LLM provider via langchain-google-genai."""
+    """Google Gemini LLM provider via langchain-google-genai. Model MUST be specified."""
 
-    def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
+    def __init__(self, model: str, api_key: str | None = None) -> None:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError as e:
-            raise ImportError("Install langchain-google-genai: pip install langchain-google-genai") from e
+            raise ImportError(
+                "Install langchain-google-genai: pip install langchain-google-genai"
+            ) from e
 
         settings = get_settings()
-        self._model = model or getattr(settings, "GOOGLE_MODEL", "gemini-2.0-flash")
+        self._model = model
         self._llm = ChatGoogleGenerativeAI(
             model=self._model,
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_TOKENS,
-            google_api_key=api_key or getattr(settings, "GOOGLE_API_KEY", ""),
+            google_api_key=api_key or settings.GOOGLE_API_KEY,
         )
 
     async def generate(
@@ -41,7 +51,7 @@ class GoogleProvider(LLMPort):
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
 
-        logger.debug(f"[Google] Calling {self._model}, prompt_len={len(prompt)}")
+        logger.debug("[Google] Calling %s, prompt_len=%d", self._model, len(prompt))
         response = await self._llm.ainvoke(messages)
 
         usage = response.usage_metadata or {}

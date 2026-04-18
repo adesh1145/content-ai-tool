@@ -1,5 +1,6 @@
 """
 Driven adapter: LangChain email content generation with email-type-specific system prompts.
+Uses the LLM configured in EMAIL_WRITER_LLM from model_config.py.
 
 cold_email  -> Concise, clear CTA, professional
 newsletter  -> Informative, engaging, value-driven
@@ -17,6 +18,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.features.email_writer.domain.port.outbound.email_ai_port import EmailAIPort
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import EMAIL_WRITER_LLM
 
 _TYPE_PROMPTS = {
     "cold_email": (
@@ -54,13 +56,11 @@ _HUMAN_PROMPT = (
 
 
 class EmailAIService(EmailAIPort):
-    """
-    Implements EmailAIPort using LangChain with email-type-specific system prompts.
-    """
+    """Implements EmailAIPort. Model from model_config.py."""
 
-    def __init__(self, provider: str = "openai", model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        step = EMAIL_WRITER_LLM.get_step("generate")
+        self._llm = get_llm_registry().get_langchain_llm(step.provider, step.model)
 
     async def generate(
         self,

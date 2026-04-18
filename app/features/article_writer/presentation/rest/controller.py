@@ -12,6 +12,7 @@ from app.features.article_writer.presentation.rest.dto.request import (
 from app.features.article_writer.presentation.rest.dto.response import (
     ArticleResponse,
 )
+from app.features.article_writer.presentation.rest.mapper import ArticleRestMapper
 from app.features.article_writer.application.command.generate_article_command import (
     GenerateArticleCommand,
 )
@@ -51,17 +52,7 @@ async def generate_article(
             )
         )
         return ApiResponse.ok(
-            ArticleResponse(
-                article_id=result.article_id,
-                topic=result.topic,
-                title=result.title,
-                content=result.content,
-                meta_title=result.meta_title,
-                meta_description=result.meta_description,
-                word_count=result.word_count,
-                tokens_used=result.tokens_used,
-                status=result.status,
-            ),
+            ArticleRestMapper.to_response(result),
             message="Article generated successfully.",
         )
     except AppException as exc:
@@ -82,18 +73,7 @@ async def get_article(
         result = await service.execute(
             GetArticleQuery(article_id=article_id, user_id=user_id)
         )
-        return ApiResponse.ok(
-            ArticleResponse(
-                article_id=result.article_id,
-                topic=result.topic,
-                title=result.title,
-                content=result.content,
-                meta_title=result.meta_title,
-                meta_description=result.meta_description,
-                word_count=result.word_count,
-                tokens_used=result.tokens_used,
-                status=result.status,
-            )
-        )
+        return ApiResponse.ok(ArticleRestMapper.to_response(result))
     except AppException as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
+

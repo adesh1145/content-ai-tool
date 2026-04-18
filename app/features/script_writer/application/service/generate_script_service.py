@@ -11,7 +11,7 @@ from app.features.script_writer.domain.exception.script_generation_failed import
     ScriptGenerationFailed,
 )
 from app.features.script_writer.domain.model.script import Script
-from app.features.script_writer.domain.port.inbound.generate_script_port import IGenerateScript
+from app.features.script_writer.application.port.inbound.generate_script_port import IGenerateScript
 from app.features.script_writer.domain.port.outbound.script_ai_port import IScriptAIService
 from app.features.script_writer.domain.port.outbound.script_repository_port import (
     IScriptRepository,

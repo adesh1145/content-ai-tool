@@ -14,7 +14,7 @@ from app.features.seo_optimizer.application.result.seo_analysis_result import (
 from app.features.seo_optimizer.application.validator.seo_validator import SEOValidator
 from app.features.seo_optimizer.domain.exception.seo_analysis_failed import SEOAnalysisFailed
 from app.features.seo_optimizer.domain.model.seo_analysis import SEOAnalysis
-from app.features.seo_optimizer.domain.port.inbound.analyze_seo_port import IAnalyzeSEO
+from app.features.seo_optimizer.application.port.inbound.analyze_seo_port import IAnalyzeSEO
 from app.features.seo_optimizer.domain.port.outbound.seo_ai_port import ISEOAIPort
 from app.features.seo_optimizer.domain.port.outbound.seo_repository_port import ISEORepository
 from app.features.seo_optimizer.domain.service.keyword_density_service import (

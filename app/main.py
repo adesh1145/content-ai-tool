@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
     logger.info("Starting %s v%s [%s]", settings.APP_NAME, settings.APP_VERSION, settings.APP_ENV)
-    logger.info("LLM Provider: %s", settings.LLM_PROVIDER.upper())
+    logger.info("LLM: per-feature multi-model (see model_config.py)")
 
     await create_all_tables()
     logger.info("Database tables ready")
@@ -81,12 +81,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["Health"])
     async def health_check():
+        from app.infrastructure.ai.llm_registry import get_llm_registry
         return {
             "status": "healthy",
             "app": settings.APP_NAME,
             "version": settings.APP_VERSION,
             "env": settings.APP_ENV,
-            "llm_provider": settings.LLM_PROVIDER,
+            "llm_providers_available": get_llm_registry().available_providers,
         }
 
     @app.get("/", tags=["Root"])

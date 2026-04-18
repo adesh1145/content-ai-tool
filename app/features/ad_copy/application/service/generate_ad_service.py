@@ -7,7 +7,7 @@ from app.features.ad_copy.application.result.ad_result import AdResult
 from app.features.ad_copy.application.validator.ad_validator import AdValidator
 from app.features.ad_copy.domain.exception.ad_generation_failed import AdGenerationFailed
 from app.features.ad_copy.domain.model.ad_copy import AdCopy
-from app.features.ad_copy.domain.port.inbound.generate_ad_port import GenerateAdPort
+from app.features.ad_copy.application.port.inbound.generate_ad_port import GenerateAdPort
 from app.features.ad_copy.domain.port.outbound.ad_ai_port import AdAIPort
 from app.features.ad_copy.domain.port.outbound.ad_repository_port import AdRepositoryPort
 

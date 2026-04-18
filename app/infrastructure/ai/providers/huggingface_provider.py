@@ -1,3 +1,11 @@
+"""
+HuggingFace LLM provider — requires explicit model name.
+
+Usage:
+    provider = HuggingFaceProvider(model="mistralai/Mistral-7B-Instruct-v0.3")
+    provider = HuggingFaceProvider(model="meta-llama/Llama-3-8B-Instruct")
+"""
+
 from __future__ import annotations
 
 import logging
@@ -9,19 +17,21 @@ logger = logging.getLogger(__name__)
 
 
 class HuggingFaceProvider(LLMPort):
-    """HuggingFace LLM provider via langchain-huggingface."""
+    """HuggingFace LLM provider via langchain-huggingface. Model MUST be specified."""
 
-    def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
+    def __init__(self, model: str, api_key: str | None = None) -> None:
         try:
             from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
         except ImportError as e:
-            raise ImportError("Install langchain-huggingface: pip install langchain-huggingface") from e
+            raise ImportError(
+                "Install langchain-huggingface: pip install langchain-huggingface"
+            ) from e
 
         settings = get_settings()
-        self._model = model or getattr(settings, "HUGGINGFACE_MODEL", "mistralai/Mistral-7B")
+        self._model = model
         endpoint = HuggingFaceEndpoint(
             repo_id=self._model,
-            huggingfacehub_api_token=api_key or getattr(settings, "HUGGINGFACE_API_KEY", ""),
+            huggingfacehub_api_token=api_key or settings.HUGGINGFACE_API_KEY,
             temperature=settings.LLM_TEMPERATURE,
             max_new_tokens=settings.LLM_MAX_TOKENS,
         )
@@ -42,7 +52,7 @@ class HuggingFaceProvider(LLMPort):
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
 
-        logger.debug(f"[HuggingFace] Calling {self._model}, prompt_len={len(prompt)}")
+        logger.debug("[HuggingFace] Calling %s, prompt_len=%d", self._model, len(prompt))
         response = await self._llm.ainvoke(messages)
 
         return LLMResponse(

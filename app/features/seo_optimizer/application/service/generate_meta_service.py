@@ -6,7 +6,7 @@ from app.features.seo_optimizer.application.command.generate_meta_command import
 )
 from app.features.seo_optimizer.application.result.meta_result import MetaResult
 from app.features.seo_optimizer.domain.exception.seo_analysis_failed import SEOAnalysisFailed
-from app.features.seo_optimizer.domain.port.inbound.generate_meta_port import IGenerateMeta
+from app.features.seo_optimizer.application.port.inbound.generate_meta_port import IGenerateMeta
 from app.features.seo_optimizer.domain.port.outbound.seo_ai_port import ISEOAIPort
 
 

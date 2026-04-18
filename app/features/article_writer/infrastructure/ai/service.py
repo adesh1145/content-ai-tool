@@ -1,12 +1,14 @@
 """
 Driven adapter: LangGraph 5-step article generation pipeline.
 
-Pipeline:
-  1. research  -> Identify angles, sources, key points
-  2. outline   -> Create detailed section structure
-  3. draft     -> Write each section
-  4. edit      -> Self-review and improve
-  5. finalize  -> Add SEO metadata (meta_title, meta_description)
+MULTI-LLM DESIGN — each step uses a different LLM:
+  1. research  → configured LLM (e.g. GPT-4o for broad reasoning)
+  2. outline   → configured LLM
+  3. draft     → configured LLM (e.g. Claude for prose quality)
+  4. edit      → configured LLM (e.g. Claude for editing)
+  5. finalize  → configured LLM (e.g. GPT-4o-mini for SEO metadata)
+
+Change models in model_config.py without touching this code.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from app.features.article_writer.domain.port.outbound.article_ai_port import (
     IArticleAIService,
 )
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import ARTICLE_WRITER_LLM
 
 
 class _ArticleGraphState(TypedDict):
@@ -42,8 +45,14 @@ class _ArticleGraphState(TypedDict):
     meta_description: str
 
 
+def _get_step_llm(step_name: str):
+    """Get the LangChain LLM for a specific article pipeline step."""
+    step = ARTICLE_WRITER_LLM.get_step(step_name)
+    return get_llm_registry().get_langchain_llm(step.provider, step.model)
+
+
 async def _research_node(state: _ArticleGraphState) -> _ArticleGraphState:
-    llm = get_llm_registry().get_provider("anthropic").get_langchain_llm()
+    llm = _get_step_llm("research")
     prompt = ChatPromptTemplate.from_messages([
         ("system",
          "You are a research assistant. Identify the most important angles, "
@@ -58,7 +67,7 @@ async def _research_node(state: _ArticleGraphState) -> _ArticleGraphState:
 
 
 async def _outline_node(state: _ArticleGraphState) -> _ArticleGraphState:
-    llm = get_llm_registry().get_provider("anthropic").get_langchain_llm()
+    llm = _get_step_llm("outline")
     prompt = ChatPromptTemplate.from_messages([
         ("system",
          "You are a content strategist. Create a detailed article outline "
@@ -74,7 +83,7 @@ async def _outline_node(state: _ArticleGraphState) -> _ArticleGraphState:
 
 
 async def _draft_node(state: _ArticleGraphState) -> _ArticleGraphState:
-    llm = get_llm_registry().get_provider("anthropic").get_langchain_llm()
+    llm = _get_step_llm("draft")
     prompt = ChatPromptTemplate.from_messages([
         ("system",
          "You are an expert content writer. Write a comprehensive, well-researched "
@@ -93,7 +102,7 @@ async def _draft_node(state: _ArticleGraphState) -> _ArticleGraphState:
 
 
 async def _edit_node(state: _ArticleGraphState) -> _ArticleGraphState:
-    llm = get_llm_registry().get_provider("anthropic").get_langchain_llm()
+    llm = _get_step_llm("review")
     prompt = ChatPromptTemplate.from_messages([
         ("system",
          "You are a senior editor. Review and improve the article for clarity, "
@@ -108,7 +117,7 @@ async def _edit_node(state: _ArticleGraphState) -> _ArticleGraphState:
 
 
 async def _finalize_node(state: _ArticleGraphState) -> _ArticleGraphState:
-    llm = get_llm_registry().get_provider("anthropic").get_langchain_llm()
+    llm = _get_step_llm("seo")
     prompt = ChatPromptTemplate.from_messages([
         ("system",
          "You are an SEO specialist. Generate meta title (50-60 chars) and "
@@ -171,12 +180,8 @@ def _get_graph():
 class ArticleGraphService(IArticleAIService):
     """
     Implements IArticleAIService using a LangGraph 5-step pipeline.
-    Steps: research -> outline -> draft -> edit -> finalize.
+    Each step uses a different LLM configured in ARTICLE_WRITER_LLM.
     """
-
-    def __init__(self, provider: str = "anthropic", model: str | None = None) -> None:
-        self._provider = provider
-        self._model = model
 
     async def generate_article(
         self,

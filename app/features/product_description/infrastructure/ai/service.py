@@ -1,7 +1,6 @@
 """
 Driven adapter: LangChain product description generation using F-A-B framework.
-
-F-A-B = Feature-Advantage-Benefit
+Uses the LLM configured in PRODUCT_DESCRIPTION_LLM from model_config.py.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.features.product_description.domain.port.outbound.product_ai_port import ProductAIPort
 from app.features.product_description.domain.service.fab_framework_service import FABFrameworkService
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import PRODUCT_DESCRIPTION_LLM
 
 _SYSTEM_PROMPT = (
     "You are a world-class product copywriter. "
@@ -22,13 +22,11 @@ _SYSTEM_PROMPT = (
 
 
 class ProductAIService(ProductAIPort):
-    """
-    Implements ProductAIPort using LangChain with F-A-B framework prompts.
-    """
+    """Implements ProductAIPort. Model from model_config.py."""
 
-    def __init__(self, provider: str = "openai", model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        step = PRODUCT_DESCRIPTION_LLM.get_step("generate")
+        self._llm = get_llm_registry().get_langchain_llm(step.provider, step.model)
 
     async def generate(
         self,

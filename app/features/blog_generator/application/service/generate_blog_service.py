@@ -8,7 +8,7 @@ from app.features.blog_generator.application.validator.blog_validator import Blo
 from app.features.blog_generator.domain.exception.blog_generation_failed import BlogGenerationFailed
 from app.features.blog_generator.domain.model.blog_content import BlogContent
 from app.features.blog_generator.domain.model.seo_metadata import SEOMetadata
-from app.features.blog_generator.domain.port.inbound.generate_blog_port import IGenerateBlog
+from app.features.blog_generator.application.port.inbound.generate_blog_port import IGenerateBlog
 from app.features.blog_generator.domain.port.outbound.blog_ai_port import IBlogAIService
 from app.features.blog_generator.domain.port.outbound.blog_repository_port import IBlogRepository
 

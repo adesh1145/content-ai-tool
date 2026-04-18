@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.common.exception.base_exception import AuthenticationException
 from app.features.auth.application.result.token_result import AccessTokenResult
-from app.features.auth.domain.port.inbound.refresh_token_port import IRefreshToken
+from app.features.auth.application.port.inbound.refresh_token_port import IRefreshToken
 from app.features.auth.domain.port.outbound.token_service_port import ITokenService
 from app.features.auth.domain.port.outbound.user_repository_port import IUserRepository
 

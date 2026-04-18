@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class LoginCommand(BaseModel):
-    """Command to authenticate a user and obtain tokens."""
+    """Command to authenticate a user."""
 
     email: str
     password: str

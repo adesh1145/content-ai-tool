@@ -19,10 +19,7 @@ celery_app = Celery(
     "content_ai_tool",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=[
-        "app.features.article_writer.drivers.tasks",
-        "app.features.blog_generator.drivers.tasks",
-    ],
+    include=[],
 )
 
 celery_app.conf.update(

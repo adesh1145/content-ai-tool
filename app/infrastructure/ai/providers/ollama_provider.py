@@ -1,3 +1,12 @@
+"""
+Ollama local LLM provider — requires explicit model name.
+
+Usage:
+    provider = OllamaProvider(model="llama3")
+    provider = OllamaProvider(model="mistral")
+    provider = OllamaProvider(model="codellama")
+"""
+
 from __future__ import annotations
 
 import logging
@@ -9,19 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 class OllamaProvider(LLMPort):
-    """Ollama local LLM provider via langchain-ollama."""
+    """Ollama local LLM provider via langchain-ollama. Model MUST be specified."""
 
-    def __init__(self, model: str | None = None, base_url: str | None = None) -> None:
+    def __init__(self, model: str, base_url: str | None = None) -> None:
         try:
             from langchain_ollama import ChatOllama
         except ImportError as e:
-            raise ImportError("Install langchain-ollama: pip install langchain-ollama") from e
+            raise ImportError(
+                "Install langchain-ollama: pip install langchain-ollama"
+            ) from e
 
         settings = get_settings()
-        self._model = model or getattr(settings, "OLLAMA_MODEL", "llama3")
+        self._model = model
         self._llm = ChatOllama(
             model=self._model,
-            base_url=base_url or getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434"),
+            base_url=base_url or settings.OLLAMA_BASE_URL,
             temperature=settings.LLM_TEMPERATURE,
         )
 
@@ -40,7 +51,7 @@ class OllamaProvider(LLMPort):
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
 
-        logger.debug(f"[Ollama] Calling {self._model}, prompt_len={len(prompt)}")
+        logger.debug("[Ollama] Calling %s, prompt_len=%d", self._model, len(prompt))
         response = await self._llm.ainvoke(messages)
 
         return LLMResponse(

@@ -1,5 +1,7 @@
 """
 Driven adapter: LangChain SEO AI service for recommendations and meta tag generation.
+Uses the LLMs configured in SEO_OPTIMIZER_LLM from model_config.py.
+Each use case step can use a different provider/model.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from app.features.seo_optimizer.domain.port.outbound.seo_ai_port import (
     SEORecommendationsResult,
 )
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import SEO_OPTIMIZER_LLM
 
 _RECOMMENDATIONS_SYSTEM = (
     "You are an SEO expert. Analyze the content and provide exactly 5 specific, "
@@ -49,11 +52,16 @@ _META_HUMAN = (
 
 
 class SEOAIService(ISEOAIPort):
-    """Implements ISEOAIPort using LangChain with the LLM registry."""
+    """Implements ISEOAIPort. Each step uses its own model from model_config.py."""
 
-    def __init__(self, provider: str | None = None, model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        registry = get_llm_registry()
+
+        analyze_step = SEO_OPTIMIZER_LLM.get_step("analyze")
+        meta_step = SEO_OPTIMIZER_LLM.get_step("generate_meta")
+
+        self._analyze_llm = registry.get_langchain_llm(analyze_step.provider, analyze_step.model)
+        self._meta_llm = registry.get_langchain_llm(meta_step.provider, meta_step.model)
 
     async def generate_recommendations(
         self,
@@ -68,7 +76,7 @@ class SEOAIService(ISEOAIPort):
             ("human", _RECOMMENDATIONS_HUMAN),
         ])
 
-        chain = prompt | self._llm | StrOutputParser()
+        chain = prompt | self._analyze_llm | StrOutputParser()
         raw = await chain.ainvoke({
             "content": content,
             "focus_keyword": focus_keyword or "not specified",
@@ -94,7 +102,7 @@ class SEOAIService(ISEOAIPort):
             ("human", _META_HUMAN),
         ])
 
-        chain = prompt | self._llm | StrOutputParser()
+        chain = prompt | self._meta_llm | StrOutputParser()
         raw = await chain.ainvoke({
             "content": content[:2000],
             "focus_keyword": focus_keyword or "not specified",

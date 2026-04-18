@@ -1,5 +1,6 @@
 """
 Driven adapter: LangChain script generation with format-specific prompts.
+Uses the LLM configured in SCRIPT_WRITER_LLM from model_config.py.
 
 YouTube  → Hook (0-30s) + Intro + Main Content (3-5 sections with timestamps) + CTA
 Reel     → 15-60s, HOOK -> VALUE -> CTA. Punchy, pattern interrupts
@@ -17,6 +18,7 @@ from app.features.script_writer.domain.port.outbound.script_ai_port import (
 )
 from app.features.script_writer.domain.service.script_domain_service import ScriptDomainService
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import SCRIPT_WRITER_LLM
 
 _YOUTUBE_SYSTEM = (
     "You are a YouTube scriptwriter. Write a script with this structure:\n"
@@ -65,11 +67,11 @@ _FORMAT_PROMPTS = {
 
 
 class ScriptAIService(IScriptAIService):
-    """Implements IScriptAIService using LangChain with the LLM registry."""
+    """Implements IScriptAIService. Model from model_config.py."""
 
-    def __init__(self, provider: str | None = None, model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        step = SCRIPT_WRITER_LLM.get_step("generate")
+        self._llm = get_llm_registry().get_langchain_llm(step.provider, step.model)
 
     async def generate_script(
         self,

@@ -5,7 +5,7 @@ from app.features.auth.application.command.login_command import LoginCommand
 from app.features.auth.application.result.token_result import TokenResult
 from app.features.auth.domain.event.user_logged_in_event import UserLoggedInEvent
 from app.features.auth.domain.exception.invalid_credentials import InvalidCredentialsError
-from app.features.auth.domain.port.inbound.login_user_port import ILoginUser
+from app.features.auth.application.port.inbound.login_user_port import ILoginUser
 from app.features.auth.domain.port.outbound.token_service_port import ITokenService
 from app.features.auth.domain.port.outbound.user_repository_port import IUserRepository
 from app.features.auth.domain.service.password_service import PasswordService

@@ -3,9 +3,7 @@ app/infrastructure/db/connection.py
 ─────────────────────────────────────────────────────────────
 Async SQLAlchemy database connection management.
 
-- Dev:  SQLite via aiosqlite
-- Prod: PostgreSQL via asyncpg
-  (switch by changing DATABASE_URL in .env)
+- PostgreSQL via asyncpg
 """
 
 from __future__ import annotations
@@ -26,8 +24,6 @@ settings = get_settings()
 # ── Engine ────────────────────────────────────────────────────────────────────
 
 _connect_args: dict = {}
-if settings.is_sqlite:
-    _connect_args = {"check_same_thread": False}
 
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,

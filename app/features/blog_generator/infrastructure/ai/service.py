@@ -1,11 +1,16 @@
 """
+app/features/blog_generator/infrastructure/ai/service.py
+─────────────────────────────────────────────────────────────
 LangChain multi-step blog generation pipeline.
 
-Pipeline:
-  1. Outline Generator  -> structured section headings
-  2. Content Writer     -> full markdown blog body
-  3. SEO Optimizer      -> meta title, description, slug
-  4. Readability Check  -> Flesch-Kincaid score via textstat
+MULTI-LLM DESIGN:
+  Each pipeline step uses a DIFFERENT LLM based on model_config.py:
+    - Step 1: Outline Generator  → configured LLM (e.g. GPT-4o-mini — fast)
+    - Step 2: Content Writer     → configured LLM (e.g. GPT-4o — best quality)
+    - Step 3: SEO Optimizer      → configured LLM (e.g. GPT-4o-mini — structured)
+    - Step 4: Readability Check  → textstat (no LLM)
+
+  Change models in model_config.py without touching this code.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ from app.features.blog_generator.domain.port.outbound.blog_ai_port import (
 )
 from app.features.blog_generator.domain.service.blog_domain_service import BlogDomainService
 from app.infrastructure.ai.llm_registry import get_llm_registry
+from app.infrastructure.ai.model_config import BLOG_GENERATOR_LLM
 
 
 def _slugify(text: str) -> str:
@@ -32,13 +38,26 @@ def _slugify(text: str) -> str:
 
 class BlogAIService(IBlogAIService):
     """
-    Implements IBlogAIService using a multi-step LangChain pipeline.
-    Uses the LLM registry to obtain the underlying language model.
+    Implements IBlogAIService using a multi-step, multi-LLM pipeline.
+
+    Each step uses a DIFFERENT LLM based on BLOG_GENERATOR_LLM config:
+      - outline_llm: fast model for structured outline
+      - writer_llm:  high-quality model for prose
+      - seo_llm:     fast model for structured SEO metadata
     """
 
-    def __init__(self, provider: str = "openai", model: str | None = None) -> None:
-        llm_provider = get_llm_registry().get_provider(provider, model)
-        self._llm = llm_provider.get_langchain_llm()
+    def __init__(self) -> None:
+        registry = get_llm_registry()
+        config = BLOG_GENERATOR_LLM
+
+        # Each step gets its own LLM — can be different providers/models
+        outline_step = config.get_step("outline")
+        writer_step = config.get_step("writer")
+        seo_step = config.get_step("seo")
+
+        self._outline_llm = registry.get_langchain_llm(outline_step.provider, outline_step.model)
+        self._writer_llm = registry.get_langchain_llm(writer_step.provider, writer_step.model)
+        self._seo_llm = registry.get_langchain_llm(seo_step.provider, seo_step.model)
 
     async def generate_blog(
         self,
@@ -96,7 +115,7 @@ class BlogAIService(IBlogAIService):
              "Target audience: {target_audience}\nWord count target: {word_count} words\n\n"
              'Return a JSON array like: ["Introduction", "Section 1", ...]'),
         ])
-        chain = prompt | self._llm | StrOutputParser()
+        chain = prompt | self._outline_llm | StrOutputParser()
         raw = await chain.ainvoke({
             "topic": topic,
             "focus_keyword": focus_keyword or topic,
@@ -127,7 +146,7 @@ class BlogAIService(IBlogAIService):
              "Target audience: {target_audience}\nOutline to follow:\n{outline}\n\n"
              "Return only the blog post in markdown format."),
         ])
-        chain = prompt | self._llm | StrOutputParser()
+        chain = prompt | self._writer_llm | StrOutputParser()
         return await chain.ainvoke({
             "topic": topic,
             "focus_keyword": focus_keyword or topic,
@@ -150,7 +169,7 @@ class BlogAIService(IBlogAIService):
              "First 200 chars of body: {body_preview}\n\n"
              'Return JSON: {{"title": "...", "meta_description": "...", "slug": "..."}}'),
         ])
-        chain = prompt | self._llm | StrOutputParser()
+        chain = prompt | self._seo_llm | StrOutputParser()
         raw = await chain.ainvoke({
             "topic": topic,
             "focus_keyword": focus_keyword or topic,

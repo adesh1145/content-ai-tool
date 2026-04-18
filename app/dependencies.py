@@ -1,6 +1,11 @@
 """
 app/dependencies.py
+─────────────────────────────────────────────────────────────
 Global FastAPI dependency injection providers.
+
+LLM NOTE: There is NO global `get_llm()` dependency here.
+Model selection is per-feature — each feature's container wires
+its own AI service with the right provider+model from model_config.py.
 """
 
 from __future__ import annotations
@@ -13,8 +18,6 @@ from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.config.settings import get_settings
-from app.common.port.outbound.llm_port import LLMPort
-from app.infrastructure.ai.llm_registry import get_llm_registry
 from app.infrastructure.db.connection import get_db_session
 
 settings = get_settings()
@@ -24,13 +27,6 @@ security = HTTPBearer()
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async for session in get_db_session():
         yield session
-
-
-def get_llm(
-    provider: str | None = None,
-    model: str | None = None,
-) -> LLMPort:
-    return get_llm_registry().get_provider(provider, model)
 
 
 def get_current_user_id(

@@ -7,7 +7,7 @@ from app.features.product_description.application.result.product_result import P
 from app.features.product_description.application.validator.product_validator import ProductValidator
 from app.features.product_description.domain.exception.product_generation_failed import ProductGenerationFailed
 from app.features.product_description.domain.model.product_description import ProductDescription
-from app.features.product_description.domain.port.inbound.generate_product_desc_port import GenerateProductDescPort
+from app.features.product_description.application.port.inbound.generate_product_desc_port import GenerateProductDescPort
 from app.features.product_description.domain.port.outbound.product_ai_port import ProductAIPort
 from app.features.product_description.domain.port.outbound.product_repository_port import ProductRepositoryPort
 

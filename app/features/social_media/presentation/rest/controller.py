@@ -12,6 +12,7 @@ from app.features.social_media.presentation.rest.dto.request import (
 from app.features.social_media.presentation.rest.dto.response import (
     SocialPostResponse,
 )
+from app.features.social_media.presentation.rest.mapper import SocialRestMapper
 from app.features.social_media.application.command.generate_social_command import (
     GenerateSocialCommand,
 )
@@ -46,15 +47,9 @@ async def generate_social_post(
             )
         )
         return ApiResponse.ok(
-            SocialPostResponse(
-                post_id=result.post_id,
-                platform=result.platform,
-                content=result.content,
-                hashtags=result.hashtags,
-                tokens_used=result.tokens_used,
-                status=result.status,
-            ),
+            SocialRestMapper.to_response(result),
             message=f"{body.platform.title()} post generated successfully.",
         )
     except AppException as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
