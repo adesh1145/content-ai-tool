@@ -59,3 +59,4 @@ class UserPlan(str, Enum):
     FREE = "free"
     PRO = "pro"
     ENTERPRISE = "enterprise"
+

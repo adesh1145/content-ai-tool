@@ -10,6 +10,12 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.port.outbound.event_publisher_port import EventPublisherPort
+from app.features.article_writer.domain.port.outbound.article_ai_port import IArticleAIService
+from app.features.article_writer.domain.port.outbound.article_repository_port import IArticleRepository
+from app.features.article_writer.application.port.inbound.generate_article_port import IGenerateArticlePort
+from app.features.article_writer.application.port.inbound.get_article_port import IGetArticlePort
+
 from app.features.article_writer.infrastructure.ai.service import (
     ArticleGraphService,
 )
@@ -27,19 +33,19 @@ from app.features.article_writer.application.service.get_article_service import 
 )
 
 
-def get_article_repository(db: AsyncSession) -> ArticleRepositoryImpl:
+def get_article_repository(db: AsyncSession) -> IArticleRepository:
     return ArticleRepositoryImpl(db)
 
 
-def get_article_ai_service() -> ArticleGraphService:
+def get_article_ai_service() -> IArticleAIService:
     return ArticleGraphService()
 
 
-def get_event_publisher() -> ArticleEventPublisher:
+def get_event_publisher() -> EventPublisherPort:
     return ArticleEventPublisher()
 
 
-def get_generate_article_service(db: AsyncSession) -> GenerateArticleService:
+def get_generate_article_service(db: AsyncSession) -> IGenerateArticlePort:
     return GenerateArticleService(
         article_repo=get_article_repository(db),
         article_ai=get_article_ai_service(),
@@ -47,5 +53,5 @@ def get_generate_article_service(db: AsyncSession) -> GenerateArticleService:
     )
 
 
-def get_get_article_service(db: AsyncSession) -> GetArticleService:
+def get_get_article_service(db: AsyncSession) -> IGetArticlePort:
     return GetArticleService(article_repo=get_article_repository(db))

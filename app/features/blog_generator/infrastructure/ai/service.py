@@ -54,11 +54,11 @@ class BlogAIService(IBlogAIService):
         outline_step = config.get_step("outline")
         writer_step = config.get_step("writer")
         seo_step = config.get_step("seo")
-
         self._outline_llm = registry.get_langchain_llm(outline_step.provider, outline_step.model)
         self._writer_llm = registry.get_langchain_llm(writer_step.provider, writer_step.model)
         self._seo_llm = registry.get_langchain_llm(seo_step.provider, seo_step.model)
 
+     
     async def generate_blog(
         self,
         *,

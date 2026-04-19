@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.dto.api_response import ApiResponse
-from app.common.exception.base_exception import AppException
 from app.dependencies import get_current_user_id
 from app.features.article_writer.presentation.rest.dto.request import (
     GenerateArticleRequest,
@@ -38,25 +37,22 @@ async def generate_article(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
-    try:
-        service = get_generate_article_service(db)
-        result = await service.execute(
-            GenerateArticleCommand(
-                user_id=user_id,
-                topic=body.topic,
-                tone=body.tone,
-                language=body.language,
-                target_audience=body.target_audience,
-                focus_keyword=body.focus_keyword,
-                word_count_target=body.word_count_target,
-            )
+    service = get_generate_article_service(db)
+    result = await service.execute(
+        GenerateArticleCommand(
+            user_id=user_id,
+            topic=body.topic,
+            tone=body.tone,
+            language=body.language,
+            target_audience=body.target_audience,
+            focus_keyword=body.focus_keyword,
+            word_count_target=body.word_count_target,
         )
-        return ApiResponse.ok(
-            ArticleRestMapper.to_response(result),
-            message="Article generated successfully.",
-        )
-    except AppException as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    )
+    return ApiResponse.ok(
+        ArticleRestMapper.to_response(result),
+        message="Article generated successfully.",
+    )
 
 
 @router.get(
@@ -68,12 +64,9 @@ async def get_article(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
-    try:
-        service = get_get_article_service(db)
-        result = await service.execute(
-            GetArticleQuery(article_id=article_id, user_id=user_id)
-        )
-        return ApiResponse.ok(ArticleRestMapper.to_response(result))
-    except AppException as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    service = get_get_article_service(db)
+    result = await service.execute(
+        GetArticleQuery(article_id=article_id, user_id=user_id)
+    )
+    return ApiResponse.ok(ArticleRestMapper.to_response(result))
 

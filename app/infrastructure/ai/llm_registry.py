@@ -68,14 +68,25 @@ class LLMRegistry:
     def get_langchain_llm(self, provider: str, model: str) -> Any:
         """
         Shortcut to get the underlying LangChain chat model directly.
-
-        Used by feature AI services that build LangChain chains/graphs.
-
-        Example:
-            llm = registry.get_langchain_llm("openai", "gpt-4o")
-            chain = prompt | llm | StrOutputParser()
+        Returns the model wrapped with Production-Grade Resilience (Retries + Fallbacks).
         """
-        return self.get(provider, model).get_langchain_llm()
+        llm = self.get(provider, model).get_langchain_llm()
+
+        # Production Resilience Logic
+        if provider == "openai":
+            fallbacks = []
+
+            # Fallback 1: Cheaper OpenAI model
+            if "gpt-4" in model:
+                fallbacks.append(self.get("openai", "gpt-3.5-turbo").get_langchain_llm())
+
+            # Fallback 2: Cross-provider fallback (Google Gemini)
+            # This ensures that even if OpenAI servers are completely down, we still function
+            fallbacks.append(self.get("google", "gemini-1.5-flash").get_langchain_llm())
+
+            llm = llm.with_fallbacks(fallbacks)
+
+        return llm
 
     # Legacy compatibility — delegates to get()
     def get_provider(

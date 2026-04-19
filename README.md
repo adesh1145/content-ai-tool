@@ -94,3 +94,20 @@ skill/                 # Master workflow guide
 - **Architecture Guide**: `skill/SKILL.md`
 - **Add a Feature**: `skill/workflows/02_add_feature.md`
 - **Run Locally**: `skill/workflows/03_run_local.md`
+
+
+
+
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d
+
+
+docker compose --env-file .env.dev -f docker-compose.dev.yml down
+
+
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
+
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml down

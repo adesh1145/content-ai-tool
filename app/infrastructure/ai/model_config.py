@@ -52,10 +52,17 @@ class FeatureLLMConfig:
 # Change provider + model per step here. No other file needs to change.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# BLOG_GENERATOR_LLM = FeatureLLMConfig(steps={
+#     "outline":  LLMStep(provider="openai",    model="gpt-4o-mini"),
+#     "writer":   LLMStep(provider="openai",    model="gpt-4o"),
+#     "seo":      LLMStep(provider="openai",    model="gpt-4o-mini"),
+# })
+
+# TEMPORARY override to use Google provider since only Google API key is available
 BLOG_GENERATOR_LLM = FeatureLLMConfig(steps={
-    "outline":  LLMStep(provider="openai",    model="gpt-4o-mini"),
-    "writer":   LLMStep(provider="openai",    model="gpt-4o"),
-    "seo":      LLMStep(provider="openai",    model="gpt-4o-mini"),
+    "outline":  LLMStep(provider="google",    model="gemini-2.5-flash"),
+    "writer":   LLMStep(provider="google",    model="gemini-2.5-flash"),
+    "seo":      LLMStep(provider="google",    model="gemini-2.5-flash"),
 })
 
 ARTICLE_WRITER_LLM = FeatureLLMConfig(steps={

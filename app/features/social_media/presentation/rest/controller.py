@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.dto.api_response import ApiResponse
-from app.common.exception.base_exception import AppException
 from app.dependencies import get_current_user_id
 from app.features.social_media.presentation.rest.dto.request import (
     GenerateSocialPostRequest,
@@ -34,22 +33,19 @@ async def generate_social_post(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
-    try:
-        service = get_generate_social_service(db)
-        result = await service.execute(
-            GenerateSocialCommand(
-                user_id=user_id,
-                platform=body.platform,
-                topic=body.topic,
-                tone=body.tone,
-                language=body.language,
-                target_audience=body.target_audience,
-            )
+    service = get_generate_social_service(db)
+    result = await service.execute(
+        GenerateSocialCommand(
+            user_id=user_id,
+            platform=body.platform,
+            topic=body.topic,
+            tone=body.tone,
+            language=body.language,
+            target_audience=body.target_audience,
         )
-        return ApiResponse.ok(
-            SocialRestMapper.to_response(result),
-            message=f"{body.platform.title()} post generated successfully.",
-        )
-    except AppException as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    )
+    return ApiResponse.ok(
+        SocialRestMapper.to_response(result),
+        message=f"{body.platform.title()} post generated successfully.",
+    )
 

@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.port.outbound.event_publisher_port import EventPublisherPort
+from app.features.auth.domain.port.outbound.user_repository_port import IUserRepository
+from app.features.auth.domain.port.outbound.token_service_port import ITokenService
+from app.features.auth.application.port.inbound.register_user_port import IRegisterUser
+from app.features.auth.application.port.inbound.login_user_port import ILoginUser
+from app.features.auth.application.port.inbound.refresh_token_port import IRefreshToken
+
 from app.features.auth.infrastructure.messaging.publisher import AuthEventPublisher
 from app.features.auth.infrastructure.persistence.repository import SQLAlchemyUserRepository
 from app.features.auth.infrastructure.security.jwt_token_service import JWTTokenService
@@ -26,26 +33,26 @@ class AuthContainer:
         self._event_publisher = AuthEventPublisher()
 
     @property
-    def user_repo(self) -> SQLAlchemyUserRepository:
+    def user_repo(self) -> IUserRepository:
         return self._user_repo
 
     @property
-    def event_publisher(self) -> AuthEventPublisher:
+    def event_publisher(self) -> EventPublisherPort:
         return self._event_publisher
 
     @property
-    def token_service(self) -> JWTTokenService:
+    def token_service(self) -> ITokenService:
         return self._token_service
 
     @property
-    def register_use_case(self) -> RegisterUserService:
+    def register_use_case(self) -> IRegisterUser:
         return RegisterUserService(
             user_repo=self._user_repo,
             event_publisher=self._event_publisher,
         )
 
     @property
-    def login_use_case(self) -> LoginUserService:
+    def login_use_case(self) -> ILoginUser:
         return LoginUserService(
             user_repo=self._user_repo,
             token_service=self._token_service,
@@ -53,7 +60,7 @@ class AuthContainer:
         )
 
     @property
-    def refresh_use_case(self) -> RefreshTokenService:
+    def refresh_use_case(self) -> IRefreshToken:
         return RefreshTokenService(
             user_repo=self._user_repo,
             token_service=self._token_service,

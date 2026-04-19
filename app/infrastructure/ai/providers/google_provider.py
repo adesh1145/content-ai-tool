@@ -34,6 +34,7 @@ class GoogleProvider(LLMPort):
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_TOKENS,
             google_api_key=api_key or settings.GOOGLE_API_KEY,
+            max_retries=3,
         )
 
     async def generate(
